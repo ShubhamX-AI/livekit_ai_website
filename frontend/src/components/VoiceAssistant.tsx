@@ -1,26 +1,32 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   useVoiceAssistant,
   BarVisualizer,
-  ControlBar,
   useChat,
+  useLocalParticipant,
+  useRoomContext,
 } from '@livekit/components-react';
-import { Sparkles, User, Mic } from 'lucide-react';
-import { Header } from './Header';
+import { Track } from 'livekit-client';
+import { Sparkles, Mic, MicOff, PhoneOff, ChevronLeft } from 'lucide-react';
 import type { TranscriptionMessage } from '../types';
 
 const VoiceAssistant: React.FC = () => {
-  const { state, audioTrack } = useVoiceAssistant();
+  // --- HOOKS ---
+  const { state, audioTrack: agentTrack } = useVoiceAssistant();
+  const { localParticipant, microphoneTrack } = useLocalParticipant();
+  const room = useRoomContext();
   const { chatMessages } = useChat();
-  const [transcripts, setTranscripts] = useState<TranscriptionMessage[]>([]);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync chat messages
+  // --- STATE ---
+  const [transcripts, setTranscripts] = useState<TranscriptionMessage[]>([]);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  // --- 1. SYNC CHAT ---
   useEffect(() => {
     if (chatMessages) {
       const formattedMessages: TranscriptionMessage[] = chatMessages.map((msg) => ({
-        id: msg.id || Date.now().toString() + Math.random().toString(),
+        id: msg.id || Math.random().toString(),
         text: msg.message,
         sender: msg.from?.identity === 'agent' ? 'agent' : 'user',
         timestamp: msg.timestamp || Date.now()
@@ -29,128 +35,198 @@ const VoiceAssistant: React.FC = () => {
     }
   }, [chatMessages]);
 
-  // Auto-scroll
+  // --- 2. AUTO SCROLL ---
   useEffect(() => {
-    if (transcriptEndRef.current) {
-      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcripts, state]);
 
-  const getStatus = () => {
-    if (state === 'speaking') return 'speaking';
-    if (state === 'listening') return 'listening';
-    return 'connected';
+  // --- 3. TRACK LOGIC (THE WAVE SOURCE) ---
+  const isAgentSpeaking = state === 'speaking';
+  
+  const userTrackRef = useMemo(() => {
+    if (!localParticipant || !microphoneTrack) return undefined;
+    return {
+      participant: localParticipant,
+      source: Track.Source.Microphone,
+      publication: microphoneTrack,
+    };
+  }, [localParticipant, microphoneTrack]);
+
+  const activeTrackReference = isAgentSpeaking ? agentTrack : userTrackRef;
+
+  // --- 4. ACTIONS ---
+  const toggleMic = () => {
+    if (localParticipant) {
+      const newVal = !isMicMuted;
+      localParticipant.setMicrophoneEnabled(!newVal);
+      setIsMicMuted(newVal);
+    }
   };
 
+  const handleDisconnect = () => {
+    room?.disconnect();
+  };
+
+  // --- THEME COLORS ---
+  // Agent: Deep Indigo/Purple | User: Emerald/Teal
+  const themeColor = isAgentSpeaking ? '#6366f1' : '#10b981'; 
+  const glowColor = isAgentSpeaking ? 'rgba(99, 102, 241, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+
   return (
-    <div className="relative flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white text-gray-800 font-sans overflow-hidden selection:bg-primary/20">
+    <div className="relative flex flex-col w-full h-[100dvh] bg-white text-slate-900 font-sans overflow-hidden">
       
-      <Header status={getStatus()} />
+      {/* --- BACKGROUND MIST --- */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+         {/* Top Gradient Blob */}
+         <div 
+           className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[150vw] h-[50vh] rounded-[100%] blur-[80px] opacity-40 transition-colors duration-1000 ease-in-out"
+           style={{ backgroundColor: isAgentSpeaking ? '#e0e7ff' : '#d1fae5' }} 
+         />
+      </div>
 
-      {/* CENTER STAGE: Visualizer & Active State */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-3xl mx-auto z-10 pt-20 pb-32">
+      {/* --- HEADER (Fixed Top Left) --- */}
+      <header className="absolute top-0 left-0 w-full p-4 md:p-8 z-50 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+            {/* Back Arrow (Visual only, or link to home) */}
+            <button onClick={handleDisconnect} className="md:hidden text-slate-400 hover:text-slate-800">
+                <ChevronLeft size={24} />
+            </button>
+
+            {/* Brand Logo */}
+            <div className="flex items-center gap-2">
+                <span className={`p-2 rounded-xl transition-colors duration-500 ${isAgentSpeaking ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    <Sparkles size={18} fill="currentColor" />
+                </span>
+                <span className="font-bold text-lg md:text-xl tracking-tight text-slate-900">
+                    INT. <span className="font-light text-slate-500">Intelligence</span>
+                </span>
+            </div>
+        </div>
+      </header>
+
+      {/* --- MAIN CONTENT AREA --- */}
+      <main className="flex-1 flex flex-col items-center relative z-10 w-full max-w-2xl mx-auto pt-24 pb-32 px-4">
         
-        {/* The "AI Brain" - Visualizer Container */}
-        <div className={`relative flex items-center justify-center w-64 h-32 mb-8 transition-all duration-700 ${
-          state === 'speaking' ? 'scale-110' : 'scale-100 opacity-90'
-        }`}>
-          
-          {/* Glow Effect behind visualizer */}
-          <div className={`absolute inset-0 bg-primary/20 blur-[60px] rounded-full transition-opacity duration-1000 ${
-            state === 'speaking' ? 'opacity-100' : 'opacity-30'
-          }`} />
-
-          {state === 'speaking' && audioTrack ? (
-            <div className="h-24 w-64 flex items-center justify-center z-20">
-              <BarVisualizer
-                state={state}
-                barCount={20} // Increased for a denser, premium look
-                trackRef={audioTrack}
-                className="h-full w-full"
-                style={{ height: '100px', width: '100%' }}
-                // You can override CSS colors for bars here if needed via global CSS or style props
+        {/* --- 1. THE WAVEFORM --- */}
+        <div className="flex-none flex flex-col items-center justify-center w-full min-h-[180px] transition-all duration-500">
+           
+           {/* Visualizer Container */}
+           <div className="relative w-full max-w-[320px] h-[64px] flex items-center justify-center mb-6">
+              
+              {/* Glow behind the wave */}
+              <div 
+                className="absolute inset-0 blur-3xl transition-colors duration-500 opacity-60 rounded-full"
+                style={{ backgroundColor: glowColor }}
               />
-            </div>
-          ) : (
-            // Idle / Listening Animation (Breathing Circle)
-            <div className="relative z-20 flex items-center justify-center">
-               <div className={`w-20 h-20 rounded-full border-4 border-gray-200 flex items-center justify-center transition-all duration-500 ${
-                 state === 'listening' ? 'border-primary animate-pulse shadow-[0_0_30px_rgba(0,0,0,0.1)]' : ''
-               }`}>
-                 <Mic className={`w-8 h-8 transition-colors duration-300 ${
-                   state === 'listening' ? 'text-primary' : 'text-gray-300'
-                 }`} />
-               </div>
-            </div>
-          )}
+
+              {activeTrackReference ? (
+                <BarVisualizer
+                  state={state}
+                  barCount={30} // High count for "Wave" look
+                  trackRef={activeTrackReference}
+                  style={{ height: '100%', width: '100%', gap: '5px' }}
+                  options={{ minHeight: 12, maxHeight: 60 }} 
+                  className="relative z-10"
+                >
+                    {/* CSS Injection for Fluid Color Change */}
+                    <style>{`
+                        .lk-audio-visualizer > rect { 
+                            fill: ${themeColor} !important; 
+                            rx: 3px; 
+                            transition: height 0.1s ease, fill 0.5s ease;
+                        } 
+                    `}</style>
+                </BarVisualizer>
+              ) : (
+                /* Idle Animation (Three Dots) */
+                <div className="flex items-center gap-2 opacity-50">
+                   <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0s'}}></div>
+                   <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0.2s'}}></div>
+                   <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0.4s'}}></div>
+                </div>
+              )}
+           </div>
+
+           {/* Status Label */}
+           <div className="text-center space-y-1">
+              <p 
+                className="text-xl md:text-2xl font-medium tracking-wide transition-colors duration-500"
+                style={{ color: themeColor }}
+              >
+                {isAgentSpeaking ? "AI is speaking" : "Listening..."}
+              </p>
+           </div>
         </div>
 
-        {/* Status Text */}
-        <h2 className="text-2xl md:text-3xl font-light text-center mb-10 transition-all duration-500 h-10">
-          {state === 'speaking' ? (
-             <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent font-medium animate-pulse">
-               Speaking...
-             </span>
-          ) : state === 'listening' ? (
-             <span className="text-gray-600">Listening...</span>
-          ) : (
-             <span className="text-gray-300">Tap mic to start</span>
-          )}
-        </h2>
-
-        {/* Floating Transcript History */}
+        {/* --- 2. CONVERSATION HISTORY (Responsive List) --- */}
         <div 
-          ref={containerRef}
-          className="w-full px-6 flex-1 overflow-y-auto custom-scrollbar mask-image-linear-fade"
+          className="flex-1 w-full overflow-y-auto custom-scrollbar relative px-2 md:px-4"
           style={{ 
-            maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)'
+            maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)'
           }}
         >
-          <div className="max-w-2xl mx-auto space-y-6 py-4">
-            {transcripts.map((msg, index) => {
-              const isLast = index === transcripts.length - 1;
-              return (
-                <div 
-                  key={msg.id} 
-                  className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`flex flex-col max-w-[85%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                    
-                    {/* Label */}
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 px-1 flex items-center gap-1">
-                      {msg.sender === 'agent' ? <Sparkles size={10} /> : <User size={10} />}
-                      {msg.sender === 'agent' ? 'AI Assistant' : 'You'}
-                    </span>
-
-                    {/* Bubble */}
-                    <div className={`
-                      relative px-6 py-4 text-base md:text-lg leading-relaxed rounded-2xl shadow-sm transition-all duration-500
-                      ${msg.sender === 'user' 
-                        ? 'bg-white border border-gray-100 text-gray-700 rounded-tr-sm' 
-                        : 'bg-white/80 backdrop-blur-sm border border-primary/10 text-gray-800 rounded-tl-sm shadow-[0_4px_20px_rgba(0,0,0,0.03)]'
-                      }
-                      ${isLast && state === 'speaking' && msg.sender === 'agent' ? 'border-primary/40 shadow-md' : ''}
-                    `}>
-                       {msg.text}
-                    </div>
-                  </div>
+          <div className="space-y-6 py-8">
+            {transcripts.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 mt-10">
+                    <p className="text-sm">Start speaking to interact</p>
                 </div>
-              );
-            })}
-            <div ref={transcriptEndRef} />
+            )}
+            
+            {transcripts.map((msg) => (
+              <div 
+                key={msg.id} 
+                className={`flex w-full animate-fade-in-up ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`
+                    px-5 py-3.5 text-[15px] md:text-base leading-relaxed max-w-[85%] md:max-w-[75%] rounded-2xl shadow-sm
+                    transition-all duration-300
+                    ${msg.sender === 'user' 
+                      ? 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tr-none' 
+                      : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-[0_2px_8px_rgba(0,0,0,0.04)]'
+                    }
+                  `}
+                >
+                    {msg.text}
+                </div>
+              </div>
+            ))}
+            <div ref={transcriptEndRef} className="h-4" />
           </div>
         </div>
 
-      </div>
+      </main>
 
-      {/* BOTTOM: Controls */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50">
-        <div className="bg-white/90 backdrop-blur-2xl border border-white/20 rounded-full p-2 pl-3 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] hover:scale-105 transition-transform duration-300">
-           <ControlBar 
-              variation="minimal" 
-              controls={{ microphone: true, camera: false, screenShare: false, chat: false, leave: true, settings: false }} 
-            />
+      {/* --- FOOTER CONTROLS (Floating & Premium) --- */}
+      <div className="absolute bottom-8 left-0 right-0 z-50 flex justify-center px-4">
+        <div className="flex items-center gap-4 md:gap-6 bg-white/80 backdrop-blur-xl border border-white/40 p-3 px-6 rounded-full shadow-2xl shadow-slate-200/50 transform hover:scale-[1.02] transition-transform duration-300">
+           
+           {/* Mute Button */}
+           <button 
+             onClick={toggleMic}
+             className={`
+               w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-300
+               ${isMicMuted 
+                 ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' 
+                 : 'bg-black text-white shadow-lg shadow-black/20 hover:bg-slate-800'
+               }
+             `}
+           >
+             {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
+           </button>
+
+           {/* Divider */}
+           <div className="w-[1px] h-8 bg-slate-200/60" />
+
+           {/* End Call Button */}
+           <button 
+             onClick={handleDisconnect}
+             className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-300"
+           >
+             <PhoneOff size={20} />
+           </button>
+
         </div>
       </div>
 
