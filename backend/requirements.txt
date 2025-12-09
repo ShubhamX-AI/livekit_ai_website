@@ -8,3 +8,4 @@ beautifulsoup4
 pip-system-certs # For self-signed certificates (SSL error)
 # uv run agent.py download-files
 fastapi[standard]
+gunicorn

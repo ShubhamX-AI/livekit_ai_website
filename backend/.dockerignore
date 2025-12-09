@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+.venv*
+venv/
+*.log
+logs
+build/
+dist/
+*.egg-info
+.idea/
+.vscode/    
+voice_profiles

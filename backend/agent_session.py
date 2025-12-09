@@ -18,7 +18,6 @@ from agents.web_agent import Webagent
 from livekit.plugins.openai import realtime
 from openai.types.beta.realtime.session import TurnDetection
 
-
 logger = logging.getLogger("agent")
 load_dotenv()
 server = AgentServer()
@@ -36,22 +35,23 @@ async def my_agent(ctx: JobContext):
     # )
 
     session = AgentSession(
-    llm=realtime.RealtimeModel(
-        model = "gpt-realtime",
-        voice="marin",
-        turn_detection=TurnDetection(
-            type="semantic_vad",
-            eagerness="high",
-            create_response=True,
-            interrupt_response=True,
+        llm=realtime.RealtimeModel(
+            model = "gpt-realtime",
+            voice="marin",
+            turn_detection=TurnDetection(
+                type="semantic_vad",
+                eagerness="high",
+                create_response=True,
+                interrupt_response=True,
+            ),
+            modalities = ['text']
         ),
-        modalities = ['text']
-    ),
-    tts=inference.TTS(model="cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"),
-    turn_detection=MultilingualModel(),
-    vad=silero.VAD.load(min_speech_duration=0.3, activation_threshold=0.6),
-    preemptive_generation=True,
-)
+        tts=inference.TTS(model="cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"),
+        turn_detection=MultilingualModel(),
+        vad=silero.VAD.load(min_speech_duration=0.3, activation_threshold=0.6),
+        preemptive_generation=True,
+        use_tts_aligned_transcript=True,
+    )
 
     # --- Background Audio Setup ---
     # background_audio = BackgroundAudioPlayer(

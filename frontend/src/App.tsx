@@ -1,11 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, StartAudio } from '@livekit/components-react';
-import VoiceAssistant from './compotents/VoiceAssistant';
-import { Loader2, AlertCircle, Mic } from 'lucide-react';
+import VoiceAssistant from './components/VoiceAssistant';
+import { Header } from './components/Header';
+import { Loader2, AlertCircle, Mic, ArrowRight } from 'lucide-react';
 
-// Use 127.0.0.1 to avoid IPv6 resolution issues with localhost on some systems
-const TOKEN_ENDPOINT = 'http://127.0.0.1:8000/api/getToken';
-const LIVEKIT_URL = 'wss://aiewebsitetest-4ewipk42.livekit.cloud';
+// Safely access environment variables with fallback
+const BACKEND_URL = import.meta.env?.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+const LIVEKIT_URL = import.meta.env?.VITE_LIVEKIT_URL || '';
+const TOKEN_ENDPOINT = `${BACKEND_URL}/api/getToken`;
+console.log("TOKEN_ENDPOINT", TOKEN_ENDPOINT);
 
 export default function App() {
   const [token, setToken] = useState<string>('');
@@ -16,17 +19,14 @@ export default function App() {
     setConnecting(true);
     setError(null);
     try {
-      // Generate a random user ID to avoid identity conflicts in the room
       const userId = `user_${Math.floor(Math.random() * 10000)}`;
       const url = `${TOKEN_ENDPOINT}?name=${userId}`;
 
-      // Add mode: 'cors' to be explicit
       const response = await fetch(url, { mode: 'cors' });
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
       
-      // The backend returns a PlainTextResponse (JWT string), not JSON.
       const accessToken = await response.text();
       
       if (!accessToken || accessToken.trim().length === 0) {
@@ -37,7 +37,7 @@ export default function App() {
       console.error("Connection failed:", err);
       let msg = "Failed to connect to backend.";
       if (err.message && err.message.includes('Failed to fetch')) {
-         msg = `Could not reach server at ${TOKEN_ENDPOINT}. Ensure your backend is running on port 8000 and allows CORS.`;
+         msg = `Could not reach server at ${BACKEND_URL}. Ensure your backend is running.`;
       } else if (err.message) {
          msg = err.message;
       }
@@ -49,45 +49,58 @@ export default function App() {
 
   if (!token) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#f8f9fa] text-[#212529] font-sans">
-        {/* Nav Placeholder */}
-        <nav className="bg-white px-10 py-5 sticky top-0 z-50 shadow-sm flex flex-col items-center gap-5 border-b border-[#e9ecef]">
-           <div className="w-full max-w-[1000px]">
-             <a href="/" className="text-2xl font-bold text-[#0056b3] no-underline">INT. <span className="font-normal text-[#6c757d]">Intelligence</span></a>
-           </div>
-        </nav>
+      <div className="flex flex-col min-h-screen bg-background text-text-main font-sans selection:bg-primary/20">
+        <Header status="disconnected" />
 
-        <main className="flex-1 flex flex-col items-center justify-center p-5">
-          <div className="max-w-md w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="space-y-4">
-              <div className="w-20 h-20 bg-[#e9ecef] rounded-full flex items-center justify-center mx-auto text-[#0056b3]">
-                 <Mic size={32} />
+        <main className="flex-1 flex flex-col items-center justify-center p-5 relative overflow-hidden">
+          
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="max-w-xl w-full text-center space-y-10 animate-fade-in-up relative z-10">
+            
+            <div className="space-y-6">
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto text-primary shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-border">
+                 <Mic size={40} strokeWidth={1.5} />
               </div>
-              <h2 className="text-3xl font-bold text-[#0056b3]">How can I help you today?</h2>
-              <p className="text-[#6c757d]">Connect to start a voice conversation with the agent.</p>
+              <div className="space-y-2">
+                <h2 className="text-4xl md:text-5xl font-bold text-primary tracking-tight">How can I help you?</h2>
+                <p className="text-text-muted text-lg max-w-md mx-auto leading-relaxed">
+                  Connect to INT. Intelligence to access real-time voice insights, analysis, and support.
+                </p>
+              </div>
             </div>
 
             {error && (
-              <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 flex items-center gap-3 text-left">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p className="text-sm">{error}</p>
+              <div className="max-w-md mx-auto p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 flex items-start gap-3 text-left shadow-sm">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p className="text-sm font-medium leading-tight">{error}</p>
               </div>
             )}
 
             <button
               onClick={connect}
               disabled={connecting}
-              className="w-full py-3 px-4 bg-[#0056b3] hover:bg-[#004494] text-white rounded-full font-medium transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
             >
               {connecting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Connecting...
+                  <span>Connecting...</span>
                 </>
               ) : (
-                "Start Conversation"
+                <>
+                  <span>Start Conversation</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
               )}
             </button>
+            
+            <div className="pt-8 flex justify-center gap-6 text-sm text-text-muted opacity-70">
+              <span className="flex items-center gap-1">Secure Connection</span>
+              <span>•</span>
+              <span className="flex items-center gap-1">Real-time Audio</span>
+            </div>
+
           </div>
         </main>
       </div>
