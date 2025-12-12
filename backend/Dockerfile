@@ -90,4 +90,4 @@ CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 # Docker build command
 # docker build -t shubhamint/ai_website_backend_livekit:latest .
 # Docker run command
-# docker run -d -p 8000:8000 shubhamint/ai_website_backend_livekit:latest
+# docker run -d -p 3011:8000 shubhamint/ai_website_backend_livekit:latest
