@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   useVoiceAssistant,
   useLocalParticipant,
@@ -40,7 +40,9 @@ const VoiceAssistant: React.FC = () => {
 
   // Track logic
   const userTrackRef = useMemo(() => {
-    if (!localParticipant || !microphoneTrack) return undefined;
+    // Even if muted, we keep the participant ref so the visualizer doesn't crash, 
+    // it will just receive no audio data.
+    if (!localParticipant) return undefined;
     return {
       participant: localParticipant,
       source: Track.Source.Microphone,
@@ -58,7 +60,12 @@ const VoiceAssistant: React.FC = () => {
   }, [agentTrack]);
 
   const isAgentSpeaking = state === 'speaking';
-  const activeTrack = isAgentSpeaking ? agentTrackRef : userTrackRef;
+  
+  // Decide which track to visualize
+  // If user is muted and Agent isn't speaking, we pass undefined to Visualizer 
+  // (Visualizer will show idle breathing animation)
+  const activeTrack = isAgentSpeaking ? agentTrackRef : (!isMicMuted ? userTrackRef : undefined);
+  
   const visualizerState = mapAgentToVisualizerState(state as string);
 
   // Chat History Logic
@@ -86,21 +93,38 @@ const VoiceAssistant: React.FC = () => {
     });
   }, [transcriptions, localParticipant]);
 
-  const toggleMic = () => {
+  // Robust Mute Handler
+  const toggleMic = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent click from bubbling
+    e.preventDefault();  // Prevent default button behavior
+    
     if (!localParticipant) return;
-    localParticipant.setMicrophoneEnabled(!isMicMuted);
-    setIsMicMuted(!isMicMuted);
-  };
+    
+    const newVal = !isMicMuted;
+    
+    try {
+      // Toggle the actual LiveKit track
+      await localParticipant.setMicrophoneEnabled(!newVal);
+      // Only update UI state if successful
+      setIsMicMuted(newVal);
+    } catch (error) {
+      console.error("Error toggling microphone:", error);
+    }
+  }, [localParticipant, isMicMuted]);
+
+  const handleDisconnect = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    room?.disconnect();
+  }, [room]);
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] bg-zinc-50 text-zinc-900 overflow-hidden flex flex-col font-sans">
       
-      {/* 1. Header (Minimal, Top Left) */}
+      {/* 1. Header */}
       <Header status={visualizerState} />
 
-      {/* 2. Chat List (NOW TAKES FULL HEIGHT) */}
+      {/* 2. Chat List */}
       <div className="flex-1 w-full relative overflow-hidden flex flex-col">
-        {/* We add a gradient mask at the bottom so text fades nicely behind the dock */}
         <ChatList messages={uiMessages} />
       </div>
 
@@ -108,42 +132,44 @@ const VoiceAssistant: React.FC = () => {
       <div className="fixed bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none">
         <div 
           className="
-            flex items-center gap-4 px-3 py-3 rounded-[28px] pointer-events-auto
-            bg-white/90 backdrop-blur-xl 
-            border border-white/40 shadow-[0_20px_40px_rgba(0,0,0,0.1)]
+            flex items-center gap-6 px-5 py-4 rounded-[32px] pointer-events-auto
+            bg-white/90 backdrop-blur-2xl 
+            border border-white/50 shadow-[0_20px_50px_rgba(0,0,0,0.1)]
             transition-all duration-500
           "
         >
            
           {/* Left: Mic Toggle */}
           <button 
+            type="button" // CRITICAL: Prevents accidental form submission behavior
             onClick={toggleMic}
             className={`
-              w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 shadow-sm
+              relative w-14 h-14 flex items-center justify-center rounded-full transition-all duration-300 shadow-sm
               ${isMicMuted 
                 ? 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200' 
-                : 'bg-zinc-900 text-white hover:bg-zinc-800 hover:scale-105'}
+                : 'bg-zinc-900 text-white hover:bg-zinc-800 hover:scale-105 hover:shadow-lg'}
             `}
           >
-            {isMicMuted ? <MicOff size={20}/> : <Mic size={20}/>}
+            {isMicMuted ? <MicOff size={22}/> : <Mic size={22}/>}
           </button>
 
-          {/* Center: The Visualizer (Divider Lines included) */}
-          <div className="h-8 w-[1px] bg-zinc-200 mx-2" />
+          {/* Center: The Premium Visualizer */}
+          <div className="h-10 w-[1px] bg-zinc-200/60 mx-1" />
           
           <VisualizerSection 
             state={visualizerState}
             trackRef={activeTrack}
           />
           
-          <div className="h-8 w-[1px] bg-zinc-200 mx-2" />
+          <div className="h-10 w-[1px] bg-zinc-200/60 mx-1" />
 
           {/* Right: End Call */}
           <button 
-            onClick={() => room?.disconnect()}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100 hover:scale-105 transition-all duration-300"
+            type="button"
+            onClick={handleDisconnect}
+            className="w-14 h-14 flex items-center justify-center rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100 hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-rose-100"
           >
-            <PhoneOff size={20}/>
+            <PhoneOff size={22}/>
           </button>
 
         </div>
