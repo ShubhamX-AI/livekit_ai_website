@@ -3,17 +3,18 @@ from livekit.agents import (Agent,
                             RunContext)
 import chromadb
 import logging
-import uuid
+import json
 from agents.agent_prompts import WEB_AGENT_PROMPT
 
 logger = logging.getLogger("agent")
 
 class Webagent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, room) -> None:
         super().__init__(
             # Instructions for the agent
             instructions=WEB_AGENT_PROMPT,
         )
+        self.room = room 
         self.chroma_client = chromadb.PersistentClient(path="./vector_db")
         self.collection = self.chroma_client.get_or_create_collection(name="indusnet_website")
         self.db_fetch_size = 5
@@ -49,13 +50,23 @@ class Webagent(Agent):
         Emit a flashcard fact.
         This tool is called by the LLM during answer generation.
         """
-        logger.info("Emitting flashcard...")
-        session_ctx = context.session.context
-        cards = session_ctx.metadata.setdefault("pending_flashcards", [])
-        cards.append({
-            "id": title.lower().replace(" ", "_"),
+        logger.info(f"Emitting flashcard: {title}")
+
+        payload = {
+            "type": "flashcard",
             "title": title,
             "value": value,
-            "emitted": False,
-        })
+        }
+
+        try:
+            await self.room.local_participant.publish_data(
+                json.dumps(payload).encode("utf-8"),
+                reliable=True,
+                topic="ui.flashcard",
+            )
+            logger.info("✅ Data packet sent successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to publish data: {e}")
+
+        return f"Flashcard '{title}' has been displayed to the user."
 

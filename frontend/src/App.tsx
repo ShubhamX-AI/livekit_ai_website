@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, StartAudio } from '@livekit/components-react';
-import VoiceAssistant from './components/VoiceAssistant';
-import { Header } from './components/Header';
+import VoiceAssistant from './components3/VoiceAssistant';
+import { Header } from './components3/Header';
 import { Loader2, AlertCircle, Mic, ArrowRight } from 'lucide-react';
 
 // Safely access environment variables with fallback
