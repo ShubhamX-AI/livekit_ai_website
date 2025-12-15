@@ -10,9 +10,7 @@ import { Mic, MicOff, PhoneOff } from 'lucide-react';
 import { Header } from './Header';
 import { VisualizerSection } from './Visualizer';
 import { ChatList } from './Chatlist';
-import { FlashcardOverlay } from './Flashcard'; // <--- Import Component
-import { useChatTranscriptions } from '../hooks/useChatTranscriptions';
-import { useFlashcards } from '../hooks/useFlashCards'; // <--- Import Hook
+import { useChatTranscriptions } from '../hooks2/useChatTranscriptions';
 
 type VisualizerState = 'speaking' | 'listening' | 'connected' | 'disconnected';
 
@@ -28,13 +26,10 @@ const VoiceAssistant: React.FC = () => {
   const room = useRoomContext();
   const [isMicMuted, setIsMicMuted] = useState(false);
 
-  // 1. Existing Chat Hook
+  // 1. One Hook to Rule Them All
+  // This now contains text messages AND flashcards in order
   const uiMessages = useChatTranscriptions();
 
-  // 2. NEW: Flashcard Hook
-  const { currentCard, dismiss } = useFlashcards();
-
-  // 3. Track logic
   const userTrackRef = useMemo(() => {
     if (!localParticipant) return undefined;
     return {
@@ -80,11 +75,7 @@ const VoiceAssistant: React.FC = () => {
       
       <Header status={visualizerState} />
 
-      {/* --- NEW: Add Flashcard Overlay here --- */}
-      <FlashcardOverlay 
-        data={currentCard} 
-        onDismiss={dismiss} 
-      />
+      {/* Removed FlashcardOverlay - cards are now inside ChatList */}
 
       <div className="flex-1 w-full relative overflow-hidden flex flex-col">
         <ChatList messages={uiMessages} />
