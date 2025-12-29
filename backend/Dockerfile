@@ -105,10 +105,12 @@ COPY --chown=appuser:appuser . .
 # Copy supervisord configuration
 COPY --chown=appuser:appuser supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Download models at build time
-USER root
-RUN python agent_session.py download-files
-USER appuser
+# Download models as appuser
+RUN echo "Downloading models..." && \
+    python agent_session.py download-files && \
+    echo "Model download completed. Listing model files:" && \
+    find /home/appuser -name "*.onnx" -type f 2>/dev/null && \
+    ls -la /home/appuser/.cache 2>/dev/null || echo "No .cache directory found"
 
 # Switch to non-privileged user
 USER appuser
