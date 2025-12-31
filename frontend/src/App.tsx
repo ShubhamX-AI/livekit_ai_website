@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, StartAudio } from '@livekit/components-react';
-import VoiceAssistant from './components3/VoiceAssistant';
-import { Header } from './components3/Header';
-import { Loader2, AlertCircle, Mic, ArrowRight } from 'lucide-react';
+import VoiceAssistant from './components2/VoiceAssistant';
+import { Header } from './components2/Header';
+import { AlertCircle, Mic } from 'lucide-react';
 
 // Safely access environment variables with fallback
 const BACKEND_URL = import.meta.env?.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -14,13 +14,14 @@ export default function App() {
   const [token, setToken] = useState<string>('');
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agent, setAgent] = useState<'web' | 'invoice' | 'restaurant'>('web');
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (chosenAgent: 'web' | 'invoice' | 'restaurant' = agent) => {
     setConnecting(true);
     setError(null);
     try {
       const userId = `user_${Math.floor(Math.random() * 10000)}`;
-      const url = `${TOKEN_ENDPOINT}?name=${userId}`;
+      const url = `${TOKEN_ENDPOINT}?name=${userId}&agent=${chosenAgent}`;
 
       const response = await fetch(url, { mode: 'cors' });
       if (!response.ok) {
@@ -37,20 +38,20 @@ export default function App() {
       console.error("Connection failed:", err);
       let msg = "Failed to connect to backend.";
       if (err.message && err.message.includes('Failed to fetch')) {
-         msg = `Could not reach server at ${BACKEND_URL}. Ensure your backend is running.`;
+          msg = `Could not reach server at ${BACKEND_URL}. Ensure your backend is running.`;
       } else if (err.message) {
-         msg = err.message;
+          msg = err.message;
       }
       setError(msg);
     } finally {
       setConnecting(false);
     }
-  }, []);
+  }, [agent]);
 
   if (!token) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-text-main font-sans selection:bg-primary/20">
-        <Header status="disconnected" />
+        <Header status="disconnected"/>
 
         <main className="flex-1 flex flex-col items-center justify-center p-5 relative overflow-hidden">
           
@@ -76,25 +77,41 @@ export default function App() {
                 <p className="text-sm font-medium leading-tight">{error}</p>
               </div>
             )}
+            <div className="flex flex-col gap-4 max-w-xs mx-auto">
+              <button
+                onClick={() => {
+                  setAgent('web');
+                  connect('web');
+                }}
+                disabled={connecting}
+                className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+              >
+                Indusnet Web Agent
+              </button>
 
-            <button
-              onClick={connect}
-              disabled={connecting}
-              className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-            >
-              {connecting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Connecting...</span>
-                </>
-              ) : (
-                <>
-                  <span>Start Conversation</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-            
+              <button
+                onClick={() => {
+                  setAgent('invoice');
+                  connect('invoice');
+                }}
+                disabled={connecting}
+                className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+              >
+                Invoice Agent
+              </button>
+              
+              <button
+                onClick={() => {
+                  setAgent('restaurant');
+                  connect('restaurant');
+                }}
+                disabled={connecting}
+                className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+              >
+                Restaurant Agent
+              </button>
+            </div>
+
             <div className="pt-8 flex justify-center gap-6 text-sm text-text-muted opacity-70">
               <span className="flex items-center gap-1">Secure Connection</span>
               <span>•</span>

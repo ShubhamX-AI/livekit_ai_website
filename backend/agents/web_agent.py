@@ -6,6 +6,7 @@ import logging
 import json
 from agents.agent_prompts import WEB_AGENT_PROMPT
 
+
 logger = logging.getLogger("agent")
 
 class Webagent(Agent):
@@ -19,6 +20,14 @@ class Webagent(Agent):
         self.collection = self.chroma_client.get_or_create_collection(name="indusnet_website")
         self.db_fetch_size = 5
     
+
+    @property
+    def welcome_message(self):
+        return (
+            "Welcome to Indus Net Technologies. "
+            "I’m Aarti, your web assistant. How can I help you today?"
+        )
+
     @function_tool
     async def lookup_website_information(self, context: RunContext, question: str):
         """Use this tool to answer any questions about Indus net Technologies."""

@@ -36,3 +36,7 @@ LIVEKIT_API_KEY="devkey"
 LIVEKIT_API_SECRET="secret"
 LIVEKIT_URL="ws://localhost:7880"
 ```
+
+
+## VERY IMPORTANT NOTE
+Agent selection MUST happen after the room is connected and a participant has joined.

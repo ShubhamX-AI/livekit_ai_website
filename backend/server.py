@@ -1,6 +1,7 @@
 import os
 import uuid
 import logging
+import json
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -26,6 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+## The agent currently supported
+ALLOWED_AGENTS = {"web", "invoice", "restaurant"}
+
 
 async def get_rooms() -> list[str]:
     logger.info("Starting get_rooms")
@@ -42,32 +46,34 @@ async def get_rooms() -> list[str]:
         logger.info("Closed LiveKitAPI client in get_rooms")
 
 
-async def generate_room_name() -> str:
-    logger.info("Starting generate_room_name")
-    name = "room-" + str(uuid.uuid4())[:8]
-    try:
-        rooms = await get_rooms()
-        logger.info(f"Current rooms: {rooms}")
-        while name in rooms:
-            logger.info(f"Generated name '{name}' already exists. Generating a new one.")
-            name = "room-" + str(uuid.uuid4())[:8]
-    except Exception as e:
-        logger.error(f"Error in generate_room_name: {e}", exc_info=True)
-    logger.info(f"Generated unused room name: {name}")
-    return name
+async def generate_room_name(agent: str) -> str:
+    """
+    Generate a unique room per user, namespaced by agent.
+    Example: web-a1b2c3d4
+    """
+    while True:
+        room_name = f"{agent}-{uuid.uuid4().hex[:8]}"
+        existing_rooms = await get_rooms()
+        if room_name not in existing_rooms:
+            return room_name
 
 
 @app.get("/api/getToken", response_class=PlainTextResponse)
-async def get_token(name: str = Query("guest"), room: Optional[str] = Query(None)):
-    logger.info(f"Received getToken request: name={name}, room={room}")
+async def get_token(name: str = Query("guest"), agent: str = Query("web") ,room: Optional[str] = Query(None)):
+    logger.info(f"Received getToken request: name={name}, room={room}, agent={agent}")
+    
+    # Validation for each agent
+    if agent not in ALLOWED_AGENTS:
+        return "Invalid agent"
     if not room:
-        room = await generate_room_name()
+        room = await generate_room_name(agent=agent)
 
     try:
         token = (
             lk_api.AccessToken(os.getenv("LIVEKIT_API_KEY"), os.getenv("LIVEKIT_API_SECRET"))
             .with_identity(name)
             .with_name(name)
+            .with_metadata(json.dumps({"agent": agent}))
             .with_grants(
                 lk_api.VideoGrants(
                     room_join=True,
@@ -76,7 +82,7 @@ async def get_token(name: str = Query("guest"), room: Optional[str] = Query(None
             )
         )
         jwt = token.to_jwt()
-        logger.info(f"Generated JWT for room {room}")
+        logger.info(f"JWT issued | room={room} | agent={agent}")
         return jwt
     except Exception as e:
         logger.error(f"Error generating JWT: {e}", exc_info=True)

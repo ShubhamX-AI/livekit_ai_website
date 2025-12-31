@@ -48,7 +48,7 @@ export function useChatTranscriptions() {
 
   // 2. Handle Flashcards
   const handleData = useCallback(
-    (payload: Uint8Array, participant?: Participant, kind?: any, topic?: string) => {
+    (payload: Uint8Array, _participant?: Participant, _kind?: any, topic?: string) => {
       if (topic !== "ui.flashcard") return;
 
       const strData = new TextDecoder().decode(payload);
