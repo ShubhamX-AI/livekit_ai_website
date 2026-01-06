@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, StartAudio } from '@livekit/components-react';
-import VoiceAssistant from './components3/VoiceAssistant';
-import { Header } from './components3/Header';
+import VoiceAssistant from './components4_bank/VoiceAssistant';
+// import BankingVoiceAssistant from './components4_bank/BankingVoiceAssistant';
+import BankingVoiceAssistant from './components4_bank/BVA';
+import { Header } from './components4_bank/Header';
 import { AlertCircle, Mic } from 'lucide-react';
 
 // Safely access environment variables with fallback
@@ -151,7 +153,8 @@ export default function App() {
         setToken('');
       }}
     >
-      <VoiceAssistant />
+      {/* <VoiceAssistant /> */}
+      {agent === 'bank' ? <BankingVoiceAssistant /> : <VoiceAssistant />}
       <RoomAudioRenderer />
       <StartAudio label="Click to allow audio playback" />
     </LiveKitRoom>
