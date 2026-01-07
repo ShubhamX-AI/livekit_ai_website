@@ -23,7 +23,7 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
         <div className="h-screen w-full bg-[#0B1426] text-white font-sans flex flex-col md:flex-row relative overflow-hidden">
 
             {/* SIDEBAR NAVIGATION (Desktop Only) */}
-            <aside className="hidden md:flex flex-col w-64 bg-[#080f1e] border-r border-white/5 h-screen sticky top-0 z-20">
+            <aside className="hidden md:flex flex-col w-64 bg-[#080f1e] border-r border-white/5 h-screen sticky top-0 z-20 shrink-0">
                 <div className="p-6 flex items-center gap-3">
                     <button
                         onClick={onBack}
@@ -41,7 +41,7 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
                     </div>
                 </div>
 
-                <nav className="flex-1 px-4 py-6 flex flex-col gap-2">
+                <nav className="flex-1 px-4 py-6 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
                     <DesktopNavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active />
                     <DesktopNavItem icon={<Wallet size={20} />} label="Accounts" />
                     <DesktopNavItem icon={<CreditCard size={20} />} label="Cards" />
@@ -100,12 +100,12 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
                 </header>
 
                 {/* COMPACT DASHBOARD CONTENT */}
-                <div className="flex-1 p-4 md:p-6 w-full max-w-7xl mx-auto overflow-hidden flex flex-col gap-4">
+                <div className="flex-1 p-4 md:p-6 w-full max-w-7xl mx-auto overflow-y-auto md:overflow-hidden flex flex-col gap-4 pb-24 md:pb-6 custom-scrollbar">
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-auto md:h-full">
 
                         {/* LEFT COLUMN (Balance + Activity) */}
-                        <div className="lg:col-span-8 flex flex-col gap-4 h-full">
+                        <div className="lg:col-span-8 flex flex-col gap-4 h-auto md:h-full">
 
                             {/* 1. BALANCE CARD - Compact */}
                             <div className="flex-none bg-gradient-to-br from-[#1A263E] to-[#0f1729] rounded-[24px] p-5 md:p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
@@ -113,9 +113,9 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
                                 <div className="relative z-10 flex flex-col h-full justify-between">
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
-                                            <h2 className="text-sm text-slate-400 mb-0.5">Savings Account <span className="text-slate-500 text-xs tracking-wider ml-1">XX3812</span></h2>
+                                            <h2 className="text-sm text-slate-400 mb-0.5 whitespace-nowrap">Savings Account <span className="text-slate-500 text-xs tracking-wider ml-1">XX3812</span></h2>
                                             <div className="flex items-center gap-2">
-                                                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">₹ 42,650.75</h1>
+                                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-tight">₹ 42,650.75</h1>
                                                 <button className="text-slate-500 hover:text-white transition-colors"><Eye size={16} /></button>
                                             </div>
                                             <p className="text-[10px] text-slate-500 mt-1">Ledger Balance: ₹ 43,210.75</p>
@@ -136,7 +136,7 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
                             </div>
 
                             {/* 3. RECENT ACTIVITY - Fill Remaining Height */}
-                            <div className="flex-1 bg-[#111e33] rounded-[24px] p-5 md:p-6 border border-white/5 flex flex-col min-h-0">
+                            <div className="flex-1 bg-[#111e33] rounded-[24px] p-5 md:p-6 border border-white/5 flex flex-col min-h-[400px] md:min-h-0">
                                 <div className="flex justify-between items-center mb-4 flex-none">
                                     <h3 className="text-base font-semibold text-white">Recent Activity</h3>
                                     <button className="text-[10px] text-[#D4AF37] font-medium hover:underline">View All</button>
@@ -190,9 +190,9 @@ export const BankingDashboardUI: React.FC<{ children?: React.ReactNode; onBack?:
                         </div>
 
                         {/* RIGHT COLUMN (Quick Actions) */}
-                        <div className="lg:col-span-4 bg-[#16293F]/50 md:bg-[#16293F] rounded-[24px] p-5 md:p-6 border border-white/5 h-full flex flex-col">
+                        <div className="lg:col-span-4 bg-[#16293F]/50 md:bg-[#16293F] rounded-[24px] p-5 md:p-6 border border-white/5 h-auto md:h-full flex flex-col min-h-[300px] md:min-h-0">
                             <h3 className="text-sm font-semibold text-slate-400 mb-4 flex-none">Quick Actions</h3>
-                            <div className="grid grid-cols-2 gap-3 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 overflow-y-auto pr-1">
                                 <ActionButton icon={<IndianRupee size={20} />} label="Transfer" />
                                 <ActionButton icon={<Receipt size={20} />} label="Pay Bills" />
                                 <ActionButton icon={<Smartphone size={20} />} label="Recharge" />

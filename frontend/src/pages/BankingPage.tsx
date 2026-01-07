@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LiveKitRoom, RoomAudioRenderer, StartAudio, useVoiceAssistant, useLocalParticipant } from '@livekit/components-react';
+import { useChatTranscriptions } from '../hooks/useChatTranscriptions';
 import { Track } from 'livekit-client';
 import { BankingDashboardUI } from '../components2_bank/banking/BankingDashboardUI';
 import { AgentCardUI } from '../components2_bank/banking/AgentCardUI';
@@ -24,6 +25,8 @@ const VoiceAssistantOverlay: React.FC<{ onDisconnect: () => void }> = ({ onDisco
     const { state, audioTrack: agentTrack } = useVoiceAssistant();
     const { localParticipant, microphoneTrack } = useLocalParticipant();
     const [isMicMuted, setIsMicMuted] = useState(false);
+    const [showChat, setShowChat] = useState(false);
+    const messages = useChatTranscriptions();
 
     // Ensure microphone is enabled on mount
     React.useEffect(() => {
@@ -56,7 +59,7 @@ const VoiceAssistantOverlay: React.FC<{ onDisconnect: () => void }> = ({ onDisco
 
     return (
         <>
-            <div className="fixed bottom-24 md:bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+            <div className={`fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-4 max-w-[calc(100vw-2rem)] transition-all duration-300 ${showChat ? 'w-full md:w-auto h-[80vh] md:h-auto' : ''}`}>
                 <AgentCardUI
                     state="active"
                     onClose={onDisconnect}
@@ -71,6 +74,9 @@ const VoiceAssistantOverlay: React.FC<{ onDisconnect: () => void }> = ({ onDisco
                     isAgentSpeaking={isAgentSpeaking}
                     visualizerState={visualizerState}
                     trackRef={activeTrack}
+                    showChat={showChat}
+                    onToggleChat={() => setShowChat(!showChat)}
+                    messages={messages}
                 />
             </div>
             <RoomAudioRenderer />
@@ -145,7 +151,7 @@ export default function BankingPage() {
                     <VoiceAssistantOverlay onDisconnect={handleDisconnect} />
                 ) : (
                     // DISCONNECTED: Show "Ask Vyom" button
-                    <div className="fixed bottom-24 md:bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+                    <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-4">
                         {/* Agent Card (Open) */}
                         {isCardOpen && (
                             <AgentCardUI

@@ -1,7 +1,9 @@
-import React from 'react';
-import { Bot, X, Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Bot, X, Mic, MicOff, PhoneOff, Loader2, MessageSquare, ChevronDown } from 'lucide-react';
 import './VoiceAgentStyles.css';
 import { VisualizerSection } from '../Visualizer';
+import { ChatList } from '../Chatlist';
+import type { ChatMessage } from '../Chatlist';
 
 interface AgentCardUIProps {
     state: 'standby' | 'connecting' | 'active';
@@ -14,6 +16,9 @@ interface AgentCardUIProps {
     visualizerState?: 'speaking' | 'listening' | 'connected' | 'disconnected';
     trackRef?: any;
     statusText?: string;
+    showChat?: boolean;
+    onToggleChat?: () => void;
+    messages?: ChatMessage[];
 }
 
 export const AgentCardUI: React.FC<AgentCardUIProps> = ({
@@ -26,10 +31,21 @@ export const AgentCardUI: React.FC<AgentCardUIProps> = ({
     isAgentSpeaking = false,
     visualizerState = 'connected',
     trackRef,
-    statusText
+    statusText,
+    showChat = false,
+    onToggleChat,
+    messages = []
 }) => {
+    // Scroll to bottom of chat
+    const chatEndRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (showChat && chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, showChat]);
+
     return (
-        <div className="pointer-events-auto bg-[#151f32]/90 backdrop-blur-2xl border border-[#D4AF37]/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-[24px] p-4 flex flex-col items-center gap-4 w-[280px] animate-fade-in-up transition-all">
+        <div className={`pointer-events-auto bg-[#151f32]/95 backdrop-blur-2xl border border-[#D4AF37]/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-[24px] p-4 flex flex-col items-center gap-4 transition-all duration-300 ease-in-out ${showChat ? 'w-[90vw] md:w-[400px] h-[600px]' : 'w-[280px] h-auto'}`}>
 
             {/* Header / Controls */}
             <div className="w-full flex justify-between items-center border-b border-white/5 pb-3">
@@ -51,24 +67,35 @@ export const AgentCardUI: React.FC<AgentCardUIProps> = ({
                 </button>
             </div>
 
-            {/* Agent Visual / Animation */}
-            <div className="relative w-24 h-24 flex items-center justify-center my-2">
-                {/* Glow Effect */}
-                <div className={`absolute inset-0 bg-[#D4AF37]/20 rounded-full blur-xl transition-all duration-300 ${isAgentSpeaking ? 'scale-125 opacity-100' : 'scale-100 opacity-50'}`}></div>
+            {/* Agent Visual / Animation (Compact only) */}
+            {!showChat && (
+                <div className="relative w-24 h-24 flex items-center justify-center my-2">
+                    {/* Glow Effect */}
+                    <div className={`absolute inset-0 bg-[#D4AF37]/20 rounded-full blur-xl transition-all duration-300 ${isAgentSpeaking ? 'scale-125 opacity-100' : 'scale-100 opacity-50'}`}></div>
 
-                {/* The Face / Icon */}
-                <div className={`relative z-10 w-20 h-20 bg-gradient-to-b from-[#D4AF37] to-[#8a7020] rounded-2xl flex items-center justify-center shadow-lg transition-transform duration-200 ${isAgentSpeaking ? 'animate-mouth-move' : ''}`}>
-                    <Bot size={40} className="text-[#0B1426]" />
+                    {/* The Face / Icon */}
+                    <div className={`relative z-10 w-20 h-20 bg-gradient-to-b from-[#D4AF37] to-[#8a7020] rounded-2xl flex items-center justify-center shadow-lg transition-transform duration-200 ${isAgentSpeaking ? 'animate-mouth-move' : ''}`}>
+                        <Bot size={40} className="text-[#0B1426]" />
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* CHAT AREA (Expanded only) */}
+            {showChat && (
+                <div className="flex-1 w-full overflow-hidden bg-[#0B1426]/50 rounded-xl relative border border-white/5">
+                    <ChatList messages={messages} compact={true} />
+                </div>
+            )}
 
             {/* Status Text & Waveform / Connect Button */}
-            <div className="w-full flex flex-col items-center gap-2 min-h-[64px] justify-center">
+            <div className={`w-full flex flex-col items-center gap-2 justify-center ${showChat ? 'min-h-[60px] pt-2 border-t border-white/5' : 'min-h-[64px]'}`}>
                 {state === 'active' ? (
                     <>
-                        <span className="text-sm font-medium text-slate-200">
-                            {statusText || (isAgentSpeaking ? "Speaking..." : "Listening...")}
-                        </span>
+                        {!showChat && (
+                            <span className="text-sm font-medium text-slate-200 text-center w-full px-2 break-words">
+                                {statusText || (isAgentSpeaking ? "Speaking..." : "Listening...")}
+                            </span>
+                        )}
                         <div className="h-8 w-full flex items-center justify-center">
                             <VisualizerSection
                                 state={visualizerState}
@@ -101,6 +128,16 @@ export const AgentCardUI: React.FC<AgentCardUIProps> = ({
                         >
                             <PhoneOff size={16} />
                         </button>
+
+                        {/* Chat Toggle Button */}
+                        {onToggleChat && (
+                            <button
+                                onClick={onToggleChat}
+                                className={`w-10 flex items-center justify-center rounded-xl transition-colors ${showChat ? 'bg-[#D4AF37] text-[#0B1426]' : 'bg-slate-700/50 text-slate-400 hover:text-white'}`}
+                            >
+                                {showChat ? <ChevronDown size={20} /> : <MessageSquare size={16} />}
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <button
