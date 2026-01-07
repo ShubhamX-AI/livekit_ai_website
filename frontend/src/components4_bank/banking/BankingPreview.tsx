@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BankingDashboardUI } from './BankingDashboardUI';
-import { Bot, Loader2 } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import './VoiceAgentStyles.css';
 import { AgentCardUI } from './AgentCardUI';
 

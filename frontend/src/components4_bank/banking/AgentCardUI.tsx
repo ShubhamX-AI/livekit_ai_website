@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bot, X, Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react';
 import './VoiceAgentStyles.css';
-import { VisualizerSection } from './Visualizer';
+import { VisualizerSection } from '../Visualizer';
 
 interface AgentCardUIProps {
     state: 'standby' | 'connecting' | 'active';

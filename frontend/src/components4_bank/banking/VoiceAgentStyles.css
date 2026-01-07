@@ -1,4 +1,4 @@
-@keyframes mouthMove {
+/* @keyframes mouthMove {
   0% {
     transform: scaleY(1);
   }
@@ -40,4 +40,4 @@
 
 .animate-pulse-ring {
   animation: pulse-ring 2s infinite;
-}
+} */
