@@ -71,7 +71,7 @@ async def my_agent(ctx: JobContext):
         llm=RealtimeModel(
             input_audio_transcription = realtime.AudioTranscription(
                     model="gpt-4o-transcribe",
-                    prompt="This is a coneversation between a customer and an agent."
+                    prompt="This is a conversation between a customer and an agent."
                 ),
             input_audio_noise_reduction = "near_field",
             turn_detection=TurnDetection(
