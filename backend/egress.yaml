@@ -1,8 +1,0 @@
-redis:
-  address: redis:6379
-
-api_key: devkey
-api_secret: secret
-
-ws_url: ws://livekit:7880
-insecure: true
