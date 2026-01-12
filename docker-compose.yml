@@ -1,5 +1,3 @@
-version: "3.9"
-
 name: livekit_ai_website
 
 services:
