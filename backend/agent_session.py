@@ -84,7 +84,7 @@ async def my_agent(ctx: JobContext):
             modalities = ['text'],
             api_key=os.getenv("OPENAI_API_KEY")
         ),
-        tts=inference.TTS(model="cartesia/sonic-3", voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f"), # Anita
+        tts=inference.TTS(model="cartesia/sonic-3", voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206"), # Neha
         # tts=cartesia.TTS(model="sonic-3", 
         #                  voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f",
         #                  api_key=os.getenv("CARTESIA_API_KEY"),
