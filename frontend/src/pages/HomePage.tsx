@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../components2_bank/Header';
 import { AlertCircle, Mic } from 'lucide-react';
 import type { AgentType } from '../types/agent';
+import { AgentButton } from '../components2_bank/AgentButton';
+import { OutboundCallModal } from '../components2_bank/OutboundCallModal';
 
 // Safely access environment variables with fallback
 const BACKEND_URL = import.meta.env?.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -12,6 +14,8 @@ export default function HomePage() {
     const navigate = useNavigate();
     const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [outboundModalOpen, setOutboundModalOpen] = useState(false);
+    const [selectedAgent, setSelectedAgent] = useState<AgentType>('web');
 
     const connect = async (chosenAgent: AgentType) => {
         setConnecting(true);
@@ -55,6 +59,22 @@ export default function HomePage() {
         }
     };
 
+    const handleWebCall = (agent: AgentType) => {
+        // preserve original behavior: navigate for bank/tour, connect for others
+        if (agent === 'bank') {
+            navigate('/bank');
+        } else if (agent === 'tour') {
+            navigate('/jharkhand');
+        } else {
+            connect(agent);
+        }
+    };
+
+    const handleOutboundCall = (agent: AgentType) => {
+        setSelectedAgent(agent);
+        setOutboundModalOpen(true);
+    };
+
     return (
         <div className="flex flex-col min-h-screen bg-background text-text-main font-sans selection:bg-primary/20">
             <Header status="disconnected" />
@@ -83,44 +103,47 @@ export default function HomePage() {
                             <p className="text-sm font-medium leading-tight">{error}</p>
                         </div>
                     )}
-                    <div className="flex flex-col gap-4 max-w-xs mx-auto">
-                        <button
-                            onClick={() => connect('web')}
-                            disabled={connecting}
-                            className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            Indusnet Web Agent
-                        </button>
 
-                        <button
-                            onClick={() => connect('invoice')}
+                    <div className="flex flex-col gap-4 max-w-xs mx-auto w-full">
+                        <AgentButton
+                            label="Indusnet Web Agent"
+                            agentType="web"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
                             disabled={connecting}
-                            className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            Invoice Agent
-                        </button>
+                        />
 
-                        <button
-                            onClick={() => connect('restaurant')}
+                        <AgentButton
+                            label="Invoice Agent"
+                            agentType="invoice"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
                             disabled={connecting}
-                            className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            Restaurant Agent
-                        </button>
-                        <button
-                            onClick={() => navigate('/bank')}
+                        />
+
+                        <AgentButton
+                            label="Restaurant Agent"
+                            agentType="restaurant"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
                             disabled={connecting}
-                            className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            Banking Agent
-                        </button>
-                        <button
-                            onClick={() => navigate('/jharkhand')}
+                        />
+
+                        <AgentButton
+                            label="Banking Agent"
+                            agentType="bank"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
                             disabled={connecting}
-                            className="group relative w-full max-w-xs mx-auto py-4 px-8 bg-primary hover:bg-primary-hover text-white text-lg rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 hover:-translate-y-1 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            Tour Agent
-                        </button>
+                        />
+
+                        <AgentButton
+                            label="Tour Agent"
+                            agentType="tour"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
+                            disabled={connecting}
+                        />
                     </div>
 
                     <div className="pt-8 flex justify-center gap-6 text-sm text-text-muted opacity-70">
@@ -131,6 +154,12 @@ export default function HomePage() {
 
                 </div>
             </main>
+
+            <OutboundCallModal
+                isOpen={outboundModalOpen}
+                onClose={() => setOutboundModalOpen(false)}
+                agentType={selectedAgent}
+            />
         </div>
     );
 }

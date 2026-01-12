@@ -34,10 +34,6 @@ app.add_middleware(
 ## The agent currently supported
 ALLOWED_AGENTS = {"web", "invoice", "restaurant", "bank", "tour"}
 
-class OutboundCallRequest(BaseModel):
-    phone_number: str
-    agent_type: str = "invoice"
-
 async def get_rooms() -> list[str]:
     logger.info("Starting get_rooms")
     client = LiveKitAPI()
@@ -103,6 +99,11 @@ async def check_password(password: str = Query("guest")):
         return "ok"
     else:
         return "Unauthorized"
+
+# OUTBOUND CALL
+class OutboundCallRequest(BaseModel):
+    phone_number: str
+    agent_type: str = "invoice"
 
 @app.post("/api/makeCall")
 async def trigger_outbound_call(request: OutboundCallRequest):

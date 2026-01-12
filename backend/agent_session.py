@@ -30,10 +30,6 @@ import os
 import json
 import asyncio
 
-# # SSL Certificate
-# import truststore
-# truststore.inject_into_ssl()
-
 # Recording input
 # from recording.recording import start_audio_recording, record_participant_audio, start_audio_recording2
 
