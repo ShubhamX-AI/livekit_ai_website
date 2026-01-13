@@ -56,7 +56,6 @@ export function AgentInteractionModal({
                             </div>
                             <span className="text-lg">Web Call</span>
                         </div>
-                        <span className="text-sm text-primary/60 font-medium">Free</span>
                     </button>
 
                     <button
@@ -72,7 +71,6 @@ export function AgentInteractionModal({
                             </div>
                             <span className="text-lg">Phone Call</span>
                         </div>
-                        <span className="text-sm text-white/80 font-medium">Mobile</span>
                     </button>
                 </div>
             </div>
