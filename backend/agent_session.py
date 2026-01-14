@@ -119,11 +119,11 @@ async def my_agent(ctx: JobContext):
     #--- Custom Background Audio Setup ---
     background_audio = BackgroundAudioPlayer(
         ambient_sound=AudioConfig(
-            os.path.join(os.path.dirname(__file__), "bg_audio", "office-ambience.wav"),
+            os.path.join(os.path.dirname(__file__), "bg_audio", "office-ambience_48k.wav"),
             volume=0.4
         ),
         thinking_sound=AudioConfig(
-            os.path.join(os.path.dirname(__file__), "bg_audio", "typing-sound.wav"),
+            os.path.join(os.path.dirname(__file__), "bg_audio", "typing-sound_48k.wav"),
             volume=0.5
         ),
     )
