@@ -23,7 +23,7 @@ async def make_call(phone_number: str, agent_type: str = "invoice"):
     # Ensure unique room name
     unique_room_name = f"{room_name}-{phone_number[-4:]}-{random.randint(1000, 9999)}"
     
-    metadata = json.dumps({"agent": agent_type, "phone": phone_number})
+    metadata = json.dumps({"agent": agent_type, "phone": phone_number, "call_type": "outbound"})
     
     logger.info(f"Creating dispatch for agent {agent_type} in room {unique_room_name} trunk id {outbound_trunk_id}")
     dispatch = await lkapi.agent_dispatch.create_dispatch(
