@@ -11,6 +11,7 @@ This project provides an interactive voice interface where users can speak with 
 - **Restaurant Agent** - Restaurant reservations and menu queries
 - **Banking Agent** - Banking services and account management
 - **Tour Agent** - Travel planning and tour information
+- **Real Estate Agent** - Property listings and inquiries
 
 Each agent uses OpenAI's Realtime API for natural, low-latency voice conversations with background audio and noise cancellation.
 
@@ -170,8 +171,8 @@ docker compose down
 For production deployments with health checks:
 
 ```bash
-chmod +x depoly.sh
-./depoly.sh
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 This script:
@@ -192,6 +193,9 @@ This script:
 | `LIVEKIT_URL` | LiveKit WebSocket URL | Yes |
 | `OPENAI_API_KEY` | OpenAI API key for Realtime API | Yes |
 | `CARTESIA_API_KEY` | Cartesia TTS API key | Optional |
+| `SIP_OUTBOUND_TRUNK_ID_TWILIO` | SIP trunk ID for outbound calls | Optional |
+| `LIVEKIT_EGRESS_URL` | LiveKit egress server URL | Optional |
+| `PORT` | Backend server port override | Optional |
 
 ### Frontend Configuration
 
@@ -202,11 +206,11 @@ This script:
 
 ### Available Agents
 
-The system supports 5 specialized agents. Specify the agent type when connecting:
+The system supports specialized agents. Specify the agent type when connecting:
 
 ```javascript
 // Frontend example
-const metadata = { agent: "web" }; // web, invoice, restaurant, bank, tour
+const metadata = { agent: "web" }; // web, invoice, restaurant, bank, tour, realestate
 ```
 
 ## 📚 Usage
@@ -252,15 +256,7 @@ my_urls = [
 
 ### Running Tests
 
-```bash
-# Backend
-cd backend
-pytest
-
-# Frontend
-cd frontend
-npm run test
-```
+No automated tests are currently configured.
 
 ### Building for Production
 
