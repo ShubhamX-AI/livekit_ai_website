@@ -10,10 +10,10 @@ from livekit.agents import (
     room_io,
     BackgroundAudioPlayer, 
     AudioConfig,           
-    BuiltinAudioClip       
+    # BuiltinAudioClip       
 )
 from livekit.plugins import noise_cancellation, silero, openai
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from agents.web.web_agent import Webagent
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
@@ -24,9 +24,11 @@ from agents.distributor.distributor_agent import DistributorAgent
 # from livekit.plugins.openai import realtime
 from livekit.plugins.openai.realtime import RealtimeModel
 from openai.types import realtime
-# from livekit.plugins import openai
-from livekit.plugins import cartesia
+from livekit.plugins import openai  
+# from livekit.plugins import cartesia
 # from livekit.plugins import gladia
+from livekit.plugins import groq
+from livekit.plugins import elevenlabs
 from openai.types.beta.realtime.session import TurnDetection
 import os
 import json
@@ -92,13 +94,31 @@ async def my_agent(ctx: JobContext):
             modalities = ['text'],
             api_key=os.getenv("OPENAI_API_KEY")
         ),
-        tts=inference.TTS(model="cartesia/sonic-3", 
-                          voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
-                          extra_kwargs={
-                              "speed": "normal",
-                              "language": "mix"
-                              }
-                            ), # Neha
+        # stt=groq.STT(
+        #     model="whisper-large-v3-turbo",
+        #     prompt=(
+        #         "The speaker is multilingual and switches between different languages dynamically. "
+        #         "Do not force any specific language for transcription. "
+        #         "Transcribe exactly what is said, preserving the original words and spelling of the language spoken."
+        #     ),
+        #     api_key=os.getenv("GROQ_API_KEY"),
+        # ),
+        # llm=openai.LLM(
+        #     model="gpt-4o", 
+        #     api_key=os.getenv("OPENAI_API_KEY")
+        # ),
+        tts=elevenlabs.TTS(
+            voice_id='X0Kc6dUd5Kws5uwEyOnL',
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            model='eleven_multilingual_v2'
+        ),
+        # tts=inference.TTS(model="cartesia/sonic-3", 
+        #                   voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
+        #                   extra_kwargs={
+        #                       "speed": "normal",
+        #                       "language": "mix"
+        #                       }
+        #                     ), # Neha
 
         # tts=cartesia.TTS(model="sonic-3", 
         #                  voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
@@ -109,7 +129,11 @@ async def my_agent(ctx: JobContext):
         #                  ),
 
         # turn_detection=MultilingualModel(),
-        #vad=silero.VAD.load(min_speech_duration=0.3, activation_threshold=0.7),
+        vad=silero.VAD.load(
+            activation_threshold=0.35,
+            min_speech_duration=0.2,
+            min_silence_duration=0.4,
+        ),
         preemptive_generation=True,
         use_tts_aligned_transcript=True,
     )

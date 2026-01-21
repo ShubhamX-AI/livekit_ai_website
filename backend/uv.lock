@@ -214,7 +214,7 @@ dependencies = [
     { name = "chromadb" },
     { name = "fastapi", extra = ["standard"] },
     { name = "gunicorn" },
-    { name = "livekit-agents", extra = ["cartesia", "openai", "silero", "turn-detector"] },
+    { name = "livekit-agents", extra = ["cartesia", "elevenlabs", "groq", "openai", "silero", "turn-detector"] },
     { name = "livekit-plugins-noise-cancellation" },
     { name = "openai" },
     { name = "pip-system-certs" },
@@ -227,7 +227,7 @@ requires-dist = [
     { name = "chromadb", specifier = ">=1.4.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.128.0" },
     { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "livekit-agents", extras = ["cartesia", "openai", "silero", "turn-detector"], specifier = "~=1.3" },
+    { name = "livekit-agents", extras = ["cartesia", "elevenlabs", "groq", "openai", "silero", "turn-detector"], specifier = "~=1.3" },
     { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2" },
     { name = "openai", specifier = ">=2.15.0" },
     { name = "pip-system-certs", specifier = ">=5.3" },
@@ -1268,6 +1268,12 @@ cartesia = [
 codecs = [
     { name = "numpy" },
 ]
+elevenlabs = [
+    { name = "livekit-plugins-elevenlabs" },
+]
+groq = [
+    { name = "livekit-plugins-groq" },
+]
 images = [
     { name = "pillow" },
 ]
@@ -1334,6 +1340,32 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a2/a8/a4f1de002c8b094a151a01f9627c7da1ec41c91eb0ad22e79bd29eb82a93/livekit_plugins_cartesia-1.3.10.tar.gz", hash = "sha256:541e5b53a7859d8bbdf680ff6375a138919f2cd56ecbfbd58a0a91cfc1f363ba", size = 12519, upload-time = "2025-12-23T19:43:11.629Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/c9/b702a81fe75ac8282be7eca477b7bb287ed774356207cdd24aed8826c50e/livekit_plugins_cartesia-1.3.10-py3-none-any.whl", hash = "sha256:56c467ab97bcc621aba7bd393a1a31d1beedc49add22813a73a87a4ccbb52c65", size = 15489, upload-time = "2025-12-23T19:43:10.013Z" },
+]
+
+[[package]]
+name = "livekit-plugins-elevenlabs"
+version = "1.3.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "livekit-agents", extra = ["codecs"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/96/d5/aa539f3b99d8e7e8915fed2561db273105bc7c8c8fe2350d48c7733e9471/livekit_plugins_elevenlabs-1.3.10.tar.gz", hash = "sha256:412e3589850a3bf433d471dd864849b58aca68fe96c10e08c2c04fc63bb068ca", size = 15602, upload-time = "2025-12-23T19:43:16.295Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/c7/e90cdd6678f67542acdd7890a8c25d8de0b45ec916047bc45f15c9576f03/livekit_plugins_elevenlabs-1.3.10-py3-none-any.whl", hash = "sha256:bcef42ac160014344349bfa1ad73ddc0ca426cafc8b961c647fc696dea9a8015", size = 17894, upload-time = "2025-12-23T19:43:15.452Z" },
+]
+
+[[package]]
+name = "livekit-plugins-groq"
+version = "1.3.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "livekit" },
+    { name = "livekit-agents", extra = ["codecs", "openai"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/24/d3/3bc7e1e742b6d6da992442ba5c8ba961b01aaf8740449670d5cf87d7ec8b/livekit_plugins_groq-1.3.10.tar.gz", hash = "sha256:f9c8e420560db7b6d2a51fc4e19f9fddbeca8c03e5a08daadd0a09cd92e21022", size = 6205, upload-time = "2025-12-23T19:43:28.807Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/58/17b340f070fba6e874c351ecd979fdf546979242a8aa3a23dcd14046d70c/livekit_plugins_groq-1.3.10-py3-none-any.whl", hash = "sha256:9d5743721132843f2077898d7512576ec9730cecacf5f1c1666ce5a256e3ff19", size = 7418, upload-time = "2025-12-23T19:43:27.946Z" },
 ]
 
 [[package]]
