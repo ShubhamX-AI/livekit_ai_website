@@ -6,14 +6,14 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     cli,
-    inference,
+    # inference,
     room_io,
     BackgroundAudioPlayer, 
     AudioConfig,           
-    BuiltinAudioClip       
+    # BuiltinAudioClip       
 )
 from livekit.plugins import noise_cancellation, silero, openai
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from agents.web.web_agent import Webagent
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
@@ -25,7 +25,7 @@ from agents.distributor.distributor_agent import DistributorAgent
 from livekit.plugins.openai.realtime import RealtimeModel
 from openai.types import realtime
 # from livekit.plugins import openai
-from livekit.plugins import cartesia
+from livekit.plugins import elevenlabs
 # from livekit.plugins import gladia
 from openai.types.beta.realtime.session import TurnDetection
 import os
@@ -92,13 +92,18 @@ async def my_agent(ctx: JobContext):
             modalities = ['text'],
             api_key=os.getenv("OPENAI_API_KEY")
         ),
-        tts=inference.TTS(model="cartesia/sonic-3", 
-                          voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
-                          extra_kwargs={
-                              "speed": "normal",
-                              "language": "mix"
-                              }
-                            ), # Neha
+        tts=elevenlabs.TTS(
+            voice_id="ODq5zmih8GrVes37Dizd",
+            model="eleven_multilingual_v2",
+            api_key=os.getenv("ELEVENLABS_API_KEY")
+        ),
+        # tts=inference.TTS(model="cartesia/sonic-3", 
+        #                   voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
+        #                   extra_kwargs={
+        #                       "speed": "normal",
+        #                       "language": "mix"
+        #                       }
+        #                     ), # Neha
 
         # tts=cartesia.TTS(model="sonic-3", 
         #                  voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
