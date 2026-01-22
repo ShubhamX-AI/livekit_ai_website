@@ -24,7 +24,7 @@ class Webagent(Agent):
     def welcome_message(self):
         return (
             "Welcome to Indus Net Technologies."
-            "I’m Aarti, your web assistant. How can I help you today?"
+            "I’m Vyom, your web assistant. How can I help you today?"
         )
 
     @function_tool
