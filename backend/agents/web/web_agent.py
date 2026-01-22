@@ -5,8 +5,6 @@ import chromadb
 import logging
 import json
 from agents.web.web_agent_prompt import WEB_AGENT_PROMPT
-from agents.shared import TTS_HUMANIFICATION_FRAMEWORK
-
 
 logger = logging.getLogger("agent")
 
@@ -14,7 +12,7 @@ class Webagent(Agent):
     def __init__(self, room) -> None:
         super().__init__(
             # Instructions for the agent
-            instructions=WEB_AGENT_PROMPT + TTS_HUMANIFICATION_FRAMEWORK,
+            instructions=WEB_AGENT_PROMPT,
         )
         self.room = room 
         self.chroma_client = chromadb.PersistentClient(path="./vector_db")
@@ -25,8 +23,8 @@ class Webagent(Agent):
     @property
     def welcome_message(self):
         return (
-            "<emotion value='content' />Welcome to Indus Net Technologies."
-            "I’m Aarti, your web assistant. How can I help you today?"
+            "Welcome to Indus Net Technologies."
+            "I’m Vyom, your web assistant. How can I help you today?"
         )
 
     @function_tool

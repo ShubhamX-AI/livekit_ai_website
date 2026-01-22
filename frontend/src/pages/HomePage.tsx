@@ -176,14 +176,23 @@ export default function HomePage() {
                             disabled={connecting}
                         />
                     
-                    <AgentButton
+                        <AgentButton
                             label="Distributor Agent"
                             agentType="distributor"
                             onWebCall={handleWebCall}
                             onOutboundCall={handleOutboundCall}
                             onMobileClick={handleMobileClick}
                             disabled={connecting}
-                    />
+                        />
+                        
+                        <AgentButton
+                            label="Bandhan Bank Agent"
+                            agentType="bandhan_banking"
+                            onWebCall={handleWebCall}
+                            onOutboundCall={handleOutboundCall}
+                            onMobileClick={handleMobileClick}
+                            disabled={connecting}
+                        />
                     </div>
 
                     <div className="pt-8 flex justify-center gap-6 text-sm text-text-muted opacity-70">

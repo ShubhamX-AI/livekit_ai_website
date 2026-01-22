@@ -6,14 +6,14 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     cli,
-    inference,
+    # inference,
     room_io,
     BackgroundAudioPlayer, 
     AudioConfig,           
-    BuiltinAudioClip       
+    # BuiltinAudioClip       
 )
-from livekit.plugins import noise_cancellation, silero, openai
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from livekit.plugins import noise_cancellation
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from agents.web.web_agent import Webagent
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
@@ -21,11 +21,12 @@ from agents.banking.banking_agent import BankingAgent
 from agents.tour.tour_agent import TourAgent
 from agents.realestate.realestate_agent import RealestateAgent
 from agents.distributor.distributor_agent import DistributorAgent
+from agents.bandhan_banking.bandhan_banking import BandhanBankingAgent
 # from livekit.plugins.openai import realtime
 from livekit.plugins.openai.realtime import RealtimeModel
 from openai.types import realtime
 # from livekit.plugins import openai
-from livekit.plugins import cartesia
+from livekit.plugins import elevenlabs
 # from livekit.plugins import gladia
 from openai.types.beta.realtime.session import TurnDetection
 import os
@@ -49,6 +50,7 @@ AGENT_TYPES = {
     "tour": TourAgent,
     "realestate": RealestateAgent,
     "distributor": DistributorAgent,
+    "bandhan_banking": BandhanBankingAgent
 }
 
 
@@ -92,37 +94,17 @@ async def my_agent(ctx: JobContext):
             modalities = ['text'],
             api_key=os.getenv("OPENAI_API_KEY")
         ),
-        tts=inference.TTS(model="cartesia/sonic-3", 
-                          voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
-                          extra_kwargs={
-                              "speed": "normal",
-                              "language": "mix"
-                              }
-                            ), # Neha
-
-        # tts=cartesia.TTS(model="sonic-3", 
-        #                  voice="47f3bbb1-e98f-4e0c-92c5-5f0325e1e206",
-        #                  api_key=os.getenv("CARTESIA_API_KEY"),
-        #                 #  emotion="happy",
-        #                 #  volume=1.2
-        #                 speed=1.0
-        #                  ),
+        tts=elevenlabs.TTS(
+            voice_id="ODq5zmih8GrVes37Dizd",
+            model=" ",
+            api_key=os.getenv("ELEVENLABS_API_KEY")
+        ),
 
         # turn_detection=MultilingualModel(),
         #vad=silero.VAD.load(min_speech_duration=0.3, activation_threshold=0.7),
         preemptive_generation=True,
         use_tts_aligned_transcript=True,
     )
-
-    # # --- Background Audio Setup ---
-    # background_audio = BackgroundAudioPlayer(
-    #     ambient_sound=[AudioConfig(BuiltinAudioClip.OFFICE_AMBIENCE, volume=1),
-    #                    AudioConfig(BuiltinAudioClip.CROWDED_ROOM, volume=1)],
-    #     thinking_sound=[
-    #         AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8),
-    #         AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=0.7),
-    #     ],
-    # )
 
     #--- Custom Background Audio Setup ---
     background_audio = BackgroundAudioPlayer(
@@ -185,26 +167,6 @@ async def my_agent(ctx: JobContext):
         except Exception:
             logger.error("Error parsing agent type from metadata. Getting default agent.")
 
-
-        # called_number =  participant.attributes.get("sip.trunkPhoneNumber")
-        # logger.info(f"Called number: {called_number}")
-
-        # # logger.info(f"Participant identity: {participant.identity}") # Comes like "sip_+1234567890"
-        # # phone_number = participant.identity.split("_")[1]
-        # # logger.info(f"SIP Call detected from {phone_number}")
-
-        # mapped_agent = get_agent_for_number(called_number)
-        # logger.info(f"Mapped agent: {mapped_agent}")
-        # if mapped_agent:
-        #     agent_type = mapped_agent
-        #     logger.info(f"Using mapped agent {agent_type} for {called_number}")
-
-    # # If NOT SIP or no mapping found, fall back to metadata
-    # if agent_type == "web" and participant.metadata:
-    #     try:
-    #         agent_type = json.loads(participant.metadata).get("agent", "web")
-    #     except Exception:
-    #         logger.error("Error parsing agent type from metadata. Getting default agent.")
 
     AgentClass = AGENT_TYPES.get(agent_type, Webagent)
 
