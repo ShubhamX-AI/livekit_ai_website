@@ -89,7 +89,7 @@ async def my_agent(ctx: JobContext):
             api_key=os.getenv("OPENAI_API_KEY")
         ),
         tts=ElevenLabsNonStreamingTTS(
-            voice_id="ODq5zmih8GrVes37Dizd",
+            voice_id="kL8yauEAuyf6botQt9wa", # Monika - Indian Female
             model="eleven_v3",
             api_key=os.getenv("ELEVENLABS_API_KEY"),
         ),

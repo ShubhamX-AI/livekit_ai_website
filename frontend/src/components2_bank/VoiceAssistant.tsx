@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   useVoiceAssistant,
   useLocalParticipant,
@@ -25,6 +25,13 @@ const VoiceAssistant: React.FC = () => {
   const { localParticipant, microphoneTrack } = useLocalParticipant();
   const room = useRoomContext();
   const [isMicMuted, setIsMicMuted] = useState(false);
+
+  // Auto-enable microphone on mount
+  useEffect(() => {
+    if (localParticipant) {
+      localParticipant.setMicrophoneEnabled(true);
+    }
+  }, [localParticipant]);
 
   // 1. One Hook to Rule Them All
   // This now contains text messages AND flashcards in order
