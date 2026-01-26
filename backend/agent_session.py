@@ -8,11 +8,11 @@ from livekit.agents import (
     JobContext,
     cli,
     room_io,
-    BackgroundAudioPlayer, 
-    AudioConfig,                
+    BackgroundAudioPlayer,
+    AudioConfig,
 )
 from livekit.plugins import noise_cancellation
-from agents.web.web_agent import Webagent
+from agents.web.web_agent2 import Webagent
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
 from agents.banking.banking_agent import BankingAgent
@@ -26,6 +26,7 @@ from openai.types.realtime import AudioTranscription
 import os
 import json
 import asyncio
+from typing import cast
 from inbound.config_manager import get_agent_for_number
 from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
 
@@ -45,7 +46,7 @@ AGENT_TYPES = {
     "tour": TourAgent,
     "realestate": RealestateAgent,
     "distributor": DistributorAgent,
-    "bandhan_banking": BandhanBankingAgent
+    "bandhan_banking": BandhanBankingAgent,
 }
 
 
@@ -64,54 +65,56 @@ server = AgentServer(
 #         logger.info(f"Egress started successfully: {info}")
 #     except Exception as e:
 #         logger.error(f"Failed to start Egress: {e}")
-    
+
+
 @server.rtc_session()
 async def my_agent(ctx: JobContext):
-
     session = AgentSession(
         llm=realtime.RealtimeModel(
             model="gpt-realtime",
-            input_audio_transcription = AudioTranscription(
-                    model="gpt-4o-mini-transcribe",
-                    prompt=(
-                        "The speaker is multilingual and switches between different languages dynamically. "
-                        "Transcribe exactly what is spoken without translating."
-                    )
+            input_audio_transcription=AudioTranscription(
+                model="gpt-4o-mini-transcribe",
+                prompt=(
+                    "The speaker is multilingual and switches between different languages dynamically. "
+                    "Transcribe exactly what is spoken without translating."
                 ),
-            input_audio_noise_reduction = "near_field",
+            ),
+            input_audio_noise_reduction="near_field",
             turn_detection=TurnDetection(
                 type="semantic_vad",
                 eagerness="low",
                 create_response=True,
                 interrupt_response=True,
             ),
-            modalities = ['text'],
-            api_key=os.getenv("OPENAI_API_KEY")
+            modalities=["text"],
+            api_key=cast(str, os.getenv("OPENAI_API_KEY")),
         ),
         tts=ElevenLabsNonStreamingTTS(
-            voice_id="kL8yauEAuyf6botQt9wa", # Monika - Indian Female
+            voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
             model="eleven_v3",
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
         ),
         preemptive_generation=True,
         use_tts_aligned_transcript=False,
     )
 
-    #--- Custom Background Audio Setup ---
+    # --- Custom Background Audio Setup ---
     background_audio = BackgroundAudioPlayer(
         ambient_sound=AudioConfig(
-            os.path.join(os.path.dirname(__file__), "bg_audio", "office-ambience_48k.wav"),
-            volume=0.4
+            os.path.join(
+                os.path.dirname(__file__), "bg_audio", "office-ambience_48k.wav"
+            ),
+            volume=0.4,
         ),
         thinking_sound=AudioConfig(
             os.path.join(os.path.dirname(__file__), "bg_audio", "typing-sound_48k.wav"),
-            volume=0.5
+            volume=0.5,
         ),
     )
-                
+
     # ---- START SESSION ----
     await session.start(
-        agent=InvoiceAgent(room=ctx.room), # Default agent
+        agent=InvoiceAgent(room=ctx.room),  # Default agent
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -124,12 +127,14 @@ async def my_agent(ctx: JobContext):
 
     # WAIT for participant
     participant = await ctx.wait_for_participant()
-    logger.info( f"Participant joined: {participant.identity}, metadata={participant.metadata}")
+    logger.info(
+        f"Participant joined: {participant.identity}, metadata={participant.metadata}"
+    )
 
     # Determine agent type based on room metadata or fallback to "web"
     agent_type = "web"
-    
-    # Check if SIP call 
+
+    # Check if SIP call
     if participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP:
         # Check sip status for incomming and outgoing
         if participant.metadata and participant.metadata.strip():
@@ -140,10 +145,12 @@ async def my_agent(ctx: JobContext):
                     agent_type = metadata.get("agent", "web")
                     logger.info(f"Agent type from metadata: {agent_type}")
             except Exception:
-                logger.error("Error parsing agent type from metadata. Getting default agent.")
+                logger.error(
+                    "Error parsing agent type from metadata. Getting default agent."
+                )
         else:
             logger.info("Inbound call detected")
-            called_number =  participant.attributes.get("sip.trunkPhoneNumber")
+            called_number = participant.attributes.get("sip.trunkPhoneNumber")
             logger.info(f"Called number: {called_number}")
             if isinstance(called_number, str) and called_number:
                 mapped_agent = get_agent_for_number(called_number)
@@ -159,8 +166,9 @@ async def my_agent(ctx: JobContext):
         try:
             agent_type = json.loads(participant.metadata).get("agent", "web")
         except Exception:
-            logger.error("Error parsing agent type from metadata. Getting default agent.")
-
+            logger.error(
+                "Error parsing agent type from metadata. Getting default agent."
+            )
 
     AgentClass = AGENT_TYPES.get(agent_type, Webagent)
 
@@ -170,13 +178,41 @@ async def my_agent(ctx: JobContext):
     # Attach the agent to the session
     session.update_agent(agent=agent_instance)
 
+    # Frontend details for the WEB agent
+    @ctx.room.on("data_received")
+    def _handle_data_received(data: rtc.DataPacket):
+        topic = getattr(data, "topic", None)
+        if topic != "ui.context":
+            return
+        payload = getattr(data, "data", None)
+        if isinstance(payload, bytes):
+            payload_text = payload.decode("utf-8", errors="ignore")
+        else:
+            payload_text = str(payload) if payload is not None else ""
+        logger.info(
+            "Received ui.context payload (len=%s): %s",
+            len(payload_text),
+            payload_text,
+        )
+        if not hasattr(agent_instance, "update_ui_context"):
+            return
+        try:
+            context_payload = json.loads(payload_text)
+        except json.JSONDecodeError:
+            logger.warning("Invalid ui.context payload")
+            return
+        logger.info("Parsed ui.context: %s", context_payload)
+        agent_instance.update_ui_context(context_payload)
+
     # Start recording in a separate task
-    #asyncio.create_task(trigger_recording(ctx.room.name, agent_type))
+    # asyncio.create_task(trigger_recording(ctx.room.name, agent_type))
     # asyncio.create_task(start_audio_recording2(ctx.room.name, agent_type))
 
     # --- Background Audio Start (before welcome message) ---
     try:
-        asyncio.create_task(background_audio.start(room=ctx.room, agent_session=session))
+        asyncio.create_task(
+            background_audio.start(room=ctx.room, agent_session=session)
+        )
         logger.info("Background audio task started")
     except Exception as e:
         logger.warning(f"Could not start background audio: {e}", exc_info=True)
@@ -185,8 +221,6 @@ async def my_agent(ctx: JobContext):
     welcome_message = agent_instance.welcome_message
     await session.say(text=welcome_message, allow_interruptions=True)
 
-        
-    
 
 if __name__ == "__main__":
     cli.run_app(server)
