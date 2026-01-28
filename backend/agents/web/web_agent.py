@@ -4,6 +4,7 @@ import chromadb
 import logging
 import json
 import asyncio
+import uuid
 from agents.web.ai_integration.functions import UIAgentFunctions
 from agents.web.web_agent_prompt import WEB_AGENT_PROMPT
 from agents.web.ui_context_manager import UIContextManager
@@ -66,17 +67,14 @@ class Webagent(Agent):
     def welcome_message(self):
         return (
             "Welcome to Indus Net Technologies."
-            " Tell me how can I help you today? What are you looking for?"
+            " Tell me how can I help you today?"
         )
 
     # Refined lookup_website_information tool
     @function_tool
     async def lookup_website_information(self, context: RunContext, question: str):
         """
-        Retrieves authoritative information about Indus Net Technologies. 
-
-        Instruction: Before calling this tool, use a brief filler phrase like 'Let me check that for you' 
-        to maintain a natural conversational flow.
+        Tool used to retrieve Information about Indus Net Technologies. 
         """
         logger.info(f"Searching knowledge base for: {question}")
         
@@ -110,6 +108,10 @@ class Webagent(Agent):
         # Get current UI context for the AI agent to consider
         ui_context = self.ui_context_manager.to_dict()
         
+        # Generate a unique stream ID for this specific generation batch
+        stream_id = str(uuid.uuid4())
+        card_index = 0
+        
         async for payload in self.ui_agent_functions.query_process_stream(
             user_input=user_input, db_results=db_results, ui_context=ui_context
         ):
@@ -121,12 +123,17 @@ class Webagent(Agent):
                 logger.info(f"⏭️ Skipping redundant card: {title}")
                 continue
             
+            # Inject grouping info
+            payload["stream_id"] = stream_id
+            payload["card_index"] = card_index
+            card_index += 1
+            
             try:
                 await self.room.local_participant.publish_data(
                     json.dumps(payload).encode("utf-8"),
                     reliable=True,
                     topic="ui.flashcard",
                 )
-                logger.info("✅ Data packet sent successfully: %s", title)
+                logger.info("✅ Data packet sent successfully: %s (Stream: %s, Index: %s)", title, stream_id, payload["card_index"])
             except Exception as e:
                 logger.error(f"❌ Failed to publish data: {e}")
