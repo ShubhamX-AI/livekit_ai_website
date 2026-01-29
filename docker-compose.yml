@@ -7,7 +7,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3011:8000"
+      - "8000:8000"
     deploy:
       replicas: 1
     logging:
@@ -22,7 +22,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3010:80"
+      - "8001:80"
     depends_on:
       backend:
         condition: service_healthy
