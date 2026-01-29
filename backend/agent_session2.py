@@ -41,7 +41,7 @@ AGENT_TYPES = {
     "invoice": InvoiceAgent,
     "restaurant": RestaurantAgent,
     "bank": BankingAgent,
-    "translation": TranslationAgent
+    # "translation": TranslationAgent
 }
 
 

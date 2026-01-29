@@ -7,17 +7,14 @@ import asyncio
 import uuid
 from agents.web.ai_integration.functions import UIAgentFunctions
 from agents.web.web_agent_prompt import WEB_AGENT_PROMPT
-from agents.web.ui_context_manager import UIContextManager
-from shared_humanization_prompt.tts_humanificaiton_elevnlabs import (
-    TTS_HUMANIFICATION_ELEVNLABS,
-)
+from shared_humanization_prompt.tts_humanification_cartesia import TTS_HUMANIFICATION_CARTECIA
 
 logger = logging.getLogger(__name__)
 
 
 class Webagent(Agent):
     def __init__(self, room) -> None:
-        self._base_instruction = WEB_AGENT_PROMPT + TTS_HUMANIFICATION_ELEVNLABS
+        self._base_instruction = WEB_AGENT_PROMPT + TTS_HUMANIFICATION_CARTECIA
         super().__init__(
             # Instructions for the agent (will be updated dynamically with UI context)
             instructions=self._base_instruction,
@@ -29,38 +26,7 @@ class Webagent(Agent):
         )
         self.db_fetch_size = 5
         # UI Context Manager for state tracking and redundancy prevention
-        self.ui_context_manager = UIContextManager()
         self.ui_agent_functions = UIAgentFunctions()
-
-    # Get UI context from frontend and update agent instructions
-    def update_ui_context(self, context_payload: dict) -> None:
-        """Process UI context sync from frontend and update agent state."""
-        if not isinstance(context_payload, dict):
-            logger.info("UI context ignored (non-dict payload)")
-            return
-        
-        logger.info("UI context received: %s", context_payload)
-        
-        # Update the context manager with new state
-        self.ui_context_manager.update_from_sync(context_payload)
-        
-        # Update agent instructions with current UI state
-        self._update_instructions_with_context()
-    
-    def _update_instructions_with_context(self) -> None:
-        """Inject current UI state into agent instructions."""
-        ui_context_prompt = self.ui_context_manager.generate_context_prompt()
-        new_instructions = self._base_instruction + ui_context_prompt
-        self.update_instructions(new_instructions)
-        logger.debug("Agent instructions updated with UI context")
-
-    def is_content_visible(self, element_id: str = "", title: str = "") -> bool:
-        """Check if content is already visible on screen."""
-        if element_id and self.ui_context_manager.is_visible(element_id):
-            return True
-        if title and self.ui_context_manager.is_title_visible(title):
-            return True
-        return False
 
     # Welcome message property
     @property
@@ -95,33 +61,28 @@ class Webagent(Agent):
         # 3. Trigger UI Stream (Visual Presenter Logic)
         # This runs in the background to ensure the voice response isn't delayed
         asyncio.create_task(
-            self._publish_ui_stream(
-                user_input=question, db_results=cleaned
+            asyncio.to_thread(
+                lambda: asyncio.run(self._publish_ui_stream(question, cleaned))
             )
         )
         
         # 4. Return data to the LLM to narrate
         return cleaned
 
+    # Publish UI Stream to frontend
     async def _publish_ui_stream(self, user_input: str, db_results: str) -> None:
         """Generate and publish UI cards, filtering out already-visible content."""
-        # Get current UI context for the AI agent to consider
-        ui_context = self.ui_context_manager.to_dict()
         
         # Generate a unique stream ID for this specific generation batch
         stream_id = str(uuid.uuid4())
         card_index = 0
         
         async for payload in self.ui_agent_functions.query_process_stream(
-            user_input=user_input, db_results=db_results, ui_context=ui_context
+            user_input=user_input, db_results=db_results
         ):
             # Check for redundancy before publishing
             title = payload.get("title", "")
-            card_id = payload.get("id", payload.get("card_id", ""))
-            
-            if self.is_content_visible(element_id=card_id, title=title):
-                logger.info(f"⏭️ Skipping redundant card: {title}")
-                continue
+            _ = payload.get("id", payload.get("card_id", ""))
             
             # Inject grouping info
             payload["stream_id"] = stream_id
@@ -137,3 +98,55 @@ class Webagent(Agent):
                 logger.info("✅ Data packet sent successfully: %s (Stream: %s, Index: %s)", title, stream_id, payload["card_index"])
             except Exception as e:
                 logger.error(f"❌ Failed to publish data: {e}")
+
+        # ---- SEND END-OF-STREAM MARKER ----
+        end_of_stream_payload = {
+            "type": "end_of_stream",
+            "stream_id": stream_id,
+            "card_count": card_index
+        }
+        try:
+            await self.room.local_participant.publish_data(
+                json.dumps(end_of_stream_payload).encode("utf-8"),
+                reliable=True,
+                topic="ui.flashcard",
+            )
+            logger.info(f"✅ End-of-stream marker sent for stream: {stream_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to send end-of-stream marker: {e}")
+
+    # Get UI context from frontend and update agent instructions
+    async def update_ui_context(self, context_payload: dict) -> None:
+        """Process UI context sync from frontend and update agent state."""
+        # Extract data from the paylod
+        screen = context_payload.get("viewport", {}).get("screen", "desktop")
+        theme = context_payload.get("viewport", {}).get("theme", "light")
+        max_visible_cards = context_payload.get("viewport", {}).get("capabilities", {}).get("maxVisibleCards", 4)
+        active_elements = context_payload.get("active_elements", [])
+
+        # Update the ui agent with the ui context
+        ui_agent_context_playload = {"screen": screen, 
+                                     "theme": theme, 
+                                     "max_visible_cards": max_visible_cards,
+                                     "active_elements": active_elements}
+        await self.ui_agent_functions.update_instructions_with_context(ui_agent_context_playload)
+
+
+        # Update the instructions with current active elements/UI state
+        await self._update_instructions_with_context(active_elements)
+
+    
+    async def _update_instructions_with_context(self, active_elements: list = []) -> None:
+        """Inject current UI state into agent instructions."""
+        logger.debug("Agent instructions updated with UI context")
+        if not active_elements:
+            return
+
+        # Change the active elements in to markdown
+        active_elements = "\n\n".join(f"- {element}" for element in active_elements)
+
+        new_instructions = self._base_instruction + "\n Elements Currently Present in UI: \n" + active_elements
+
+        # 🎯 This actually updates the LLM system prompt
+        await self.update_instructions(new_instructions)
+        

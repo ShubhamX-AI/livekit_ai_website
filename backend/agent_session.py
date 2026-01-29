@@ -21,7 +21,7 @@ from agents.realestate.realestate_agent import RealestateAgent
 from agents.distributor.distributor_agent import DistributorAgent
 from agents.bandhan_banking.bandhan_banking import BandhanBankingAgent
 from openai.types.beta.realtime.session import TurnDetection
-# from livekit.plugins import cartesia
+from livekit.plugins import cartesia
 from livekit.plugins.openai import realtime
 from openai.types.realtime import AudioTranscription
 import os
@@ -29,7 +29,7 @@ import json
 import asyncio
 from typing import cast
 from inbound.config_manager import get_agent_for_number
-from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
+# from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
 
 # Recording input
 # from recording.recording import start_audio_recording, record_participant_audio, start_audio_recording2
@@ -90,12 +90,17 @@ async def my_agent(ctx: JobContext):
             modalities=["text"],
             api_key=cast(str, os.getenv("OPENAI_API_KEY")),
         ),
-        # tts=cartesia.TTS(model="sonic-3", voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f", api_key=os.getenv("CARTESIA_API_KEY")),
-        tts=ElevenLabsNonStreamingTTS(
-            voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
-            model="eleven_v3",
-            api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
-        ),
+        tts=cartesia.TTS(
+            model="sonic-3", 
+            voice="f3fc8397-87fe-4d5f-87c7-9467f62a06ac",
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            volume=1.8
+            ),
+        # tts=ElevenLabsNonStreamingTTS(
+        #     voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
+        #     model="eleven_v3",
+        #     api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
+        # ),
         preemptive_generation=True,
         use_tts_aligned_transcript=False,
     )
@@ -183,18 +188,18 @@ async def my_agent(ctx: JobContext):
     # Frontend details for the WEB agent - UI Context Sync
     @ctx.room.on("data_received")
     def _handle_data_received(data: rtc.DataPacket):
+
+        # receive the topic
         topic = getattr(data, "topic", None)
         if topic != "ui.context":
             return
+        
+        # Receive the payload
         payload = getattr(data, "data", None)
         if isinstance(payload, bytes):
             payload_text = payload.decode("utf-8", errors="ignore")
         else:
             payload_text = str(payload) if payload is not None else ""
-        
-        if not hasattr(agent_instance, "update_ui_context"):
-            logger.debug("Agent does not support UI context sync")
-            return
         
         try:
             context_payload = json.loads(payload_text)
@@ -202,18 +207,8 @@ async def my_agent(ctx: JobContext):
             logger.warning("Invalid ui.context payload - JSON parse failed")
             return
         
-        # Enhanced logging for debugging
-        msg_type = context_payload.get("type", "unknown")
-        viewport = context_payload.get("viewport", {})
-        active_elements = context_payload.get("active_elements", [])
-        logger.info(
-            "📱 UI Context Sync: type=%s, screen=%s, active_elements=%d",
-            msg_type,
-            viewport.get("screen", "unknown"),
-            len(active_elements),
-        )
-        
-        agent_instance.update_ui_context(context_payload)
+        logging.info("📱 UI Context Sync received")
+        asyncio.create_task(agent_instance.update_ui_context(context_payload))
 
     # Start recording in a separate task
     # asyncio.create_task(trigger_recording(ctx.room.name, agent_type))
