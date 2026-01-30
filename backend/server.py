@@ -11,9 +11,10 @@ from fastapi.responses import PlainTextResponse, JSONResponse
 from livekit import api as lk_api
 from livekit.api import LiveKitAPI, ListRoomsRequest
 from pydantic import BaseModel
+from api_data_structure.structure import OutboundCallRequest, OutboundTrunkCreate
 
 # Import the outbound call function
-from outbound.outbound_call import make_call, create_outbound_trunk
+from outbound.outbound_call import OutboundCall
 from inbound.config_manager import set_agent_for_number, get_agent_for_number
 
 # Configure logging
@@ -34,6 +35,9 @@ app.add_middleware(
 
 ## The agent currently supported
 ALLOWED_AGENTS = {"web", "invoice", "restaurant", "bank", "tour", "realestate","distributor","bandhan_banking"}
+
+# Initialize the classes
+outbound_call = OutboundCall()
 
 async def get_rooms() -> list[str]:
     logger.info("Starting get_rooms")
@@ -101,41 +105,47 @@ async def check_password(password: str = Query("guest")):
     else:
         return "Unauthorized"
 
-# OUTBOUND CALL
-class OutboundCallRequest(BaseModel):
-    phone_number: str
-    agent_type: str = "invoice"
 
+# Make outbound call
 @app.post("/api/makeCall")
-async def trigger_outbound_call(request: OutboundCallRequest):
-    logger.info(f"Received outbound call request: {request}")
+async def trigger_outbound_call(data: OutboundCallRequest):
+    logger.info(f"Received outbound call request: {data}")
     
-    if request.agent_type not in ALLOWED_AGENTS:
-        raise HTTPException(status_code=400, detail=f"Invalid agent type: {request.agent_type}. Allowed: {ALLOWED_AGENTS}")
+    if data.agent_type not in ALLOWED_AGENTS:
+        raise HTTPException(status_code=400, detail=f"Invalid agent type: {data.agent_type}. Allowed: {ALLOWED_AGENTS}")
         
     try:
-        await make_call(request.phone_number, request.agent_type)
-        return JSONResponse(content={"status": "success", "message": f"Verified call initiation for {request.phone_number} with agent {request.agent_type}"})
+        res = await outbound_call.make_call(data.phone_number, data.agent_type, data.call_from)
+        return res
     except Exception as e:
         logger.error(f"Failed to initiate outbound call: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Add Outboud trunk
-
-class OutboundTrunkRequest(BaseModel):
-    trunk_name: str
-    trunk_address: str
-    trunk_numbers: list
-    trunk_auth_username: str
-    trunk_auth_password: str
-
-@app.post("/api/addOutboundTrunk")
-async def add_outbound_trunk(request: OutboundTrunkRequest):
-    logger.info(f"Received outbound trunk request: {request}")
+# Create Outboud trunk
+@app.post("/api/createOutboundTrunk")
+async def create_outbound_trunk(data: OutboundTrunkCreate):
+    logger.info(f"Received outbound trunk request: {data}")
     
     try:
-        res = await create_outbound_trunk(request.trunk_name, request.trunk_address, request.trunk_numbers, request.trunk_auth_username, request.trunk_auth_password)
+        res = await outbound_call.create_outbound_trunk(data.trunk_name, 
+                                          data.trunk_address, 
+                                          data.trunk_numbers, 
+                                          data.trunk_auth_username, 
+                                          data.trunk_auth_password,
+                                          data.trunk_type
+                                          )
+        return res
+    except Exception as e:
+        logger.error(f"Failed to initiate outbound call: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# List outbound trunks
+@app.get("/api/listOutboundTrunks")
+async def list_outbound_trunks():
+    try:
+        res = await outbound_call.list_outbound_trunks()
         return res
     except Exception as e:
         logger.error(f"Failed to initiate outbound call: {e}", exc_info=True)
