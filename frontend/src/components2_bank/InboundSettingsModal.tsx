@@ -9,7 +9,6 @@ interface InboundSettingsModalProps {
 }
 
 const AGENT_OPTIONS = [
-    { value: 'web', label: 'Indusnet Web Agent' },
     { value: 'invoice', label: 'Invoice Agent' },
     { value: 'restaurant', label: 'Restaurant Agent' },
     { value: 'bank', label: 'Banking Agent' },
@@ -20,7 +19,7 @@ const AGENT_OPTIONS = [
 
 export function InboundSettingsModal({ isOpen, onClose }: InboundSettingsModalProps) {
     const [phoneNumber, setPhoneNumber] = useState<string | undefined>();
-    const [selectedAgent, setSelectedAgent] = useState('web');
+    const [selectedAgent, setSelectedAgent] = useState('invoice');
     const [isLoading, setIsLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');

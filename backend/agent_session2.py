@@ -18,7 +18,7 @@ from agents.web.web_agent import Webagent
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
 from agents.banking.banking_agent import BankingAgent
-from agents.translation.translation_agent import TranslationAgent
+# from agents.translation.translation_agent import TranslationAgent
 from livekit.plugins.openai import realtime
 from livekit.plugins import openai
 from livekit.plugins import cartesia
@@ -41,7 +41,7 @@ AGENT_TYPES = {
     "invoice": InvoiceAgent,
     "restaurant": RestaurantAgent,
     "bank": BankingAgent,
-    "translation": TranslationAgent
+    # "translation": TranslationAgent
 }
 
 

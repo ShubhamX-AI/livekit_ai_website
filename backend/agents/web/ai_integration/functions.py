@@ -15,20 +15,18 @@ class UIAgentFunctions:
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.llm_model = "gpt-4.1"
         self.logger = logging.getLogger(__name__)
+        self.instructions = SYSTEM_INSTRUCTION
 
     async def query_process_stream(
-        self, user_input: str, db_results: str, ui_context: dict
+        self, user_input: str, db_results: str
     ) -> AsyncGenerator[dict[str, Any], None]:
         try:
             self.logger.info("Starting UI stream generation with user input: %s", user_input)
             
-            # Format UI context as clear, structured JSON for the LLM
-            ui_context_str = json.dumps(ui_context, indent=2) if ui_context else "{}"
-            
             with self.openai_client.responses.stream(
                 model=self.llm_model,
                 input=[
-                    {"role": "system", "content": SYSTEM_INSTRUCTION},
+                    {"role": "system", "content": self.instructions},
                     {
                         "role": "user",
                         "content": f"""## Database Results
@@ -36,9 +34,6 @@ class UIAgentFunctions:
 
                         ## User Query
                         {user_input}
-
-                        ## Current UI Context (elements already visible to user)
-                        {ui_context_str}
 
                         ## Your Task
                         Generate flashcards for NEW information only. Check active_elements above and skip any content already displayed.""",
@@ -99,7 +94,7 @@ class UIAgentFunctions:
 
                                     try:
                                         card_obj = json.loads(raw_json)
-                                        payload = self._normalize_card_payload(card_obj)
+                                        payload = await self._normalize_card_payload(card_obj)
                                         if payload:
                                             yield payload
                                     except:
@@ -114,7 +109,7 @@ class UIAgentFunctions:
         except Exception as e:
             yield {"type": "error", "content": str(e)}
 
-    def _normalize_card_payload(self, card_obj: dict) -> dict | None:
+    async def _normalize_card_payload(self, card_obj: dict) -> dict | None:
         if not isinstance(card_obj, dict):
             return None
 
@@ -125,8 +120,11 @@ class UIAgentFunctions:
             "id",
             "title",
             "value",
-            "accentColor",
+            "visual_intent",
+            "animation_style",
             "icon",
+            "media",
+            "accentColor",
             "theme",
             "size",
             "layout",
@@ -134,6 +132,12 @@ class UIAgentFunctions:
         ):
             if key in card_obj and card_obj[key] is not None:
                 payload[key] = card_obj[key]
+
+        if "visual_intent" not in payload and "intent" in card_obj:
+            payload["visual_intent"] = card_obj["intent"]
+        
+        if "animation_style" not in payload and "animation" in card_obj:
+            payload["animation_style"] = card_obj["animation"]
 
         if "accent_color" in card_obj and "accentColor" not in payload:
             payload["accentColor"] = card_obj["accent_color"]
@@ -156,3 +160,14 @@ class UIAgentFunctions:
             return None
 
         return payload
+
+    # Update the instructions with current active elements/UI state
+    async def update_instructions_with_context(self, ui_context: dict) -> None:
+        
+        logging.info("Updating the instructions with UI context")
+        # Comvert UI context to markdown format
+        md = []
+        for key, value in ui_context.items():
+            md.append(f"**{key}**: `{json.dumps(value, indent=2) if isinstance(value, (dict, list)) else value}`")
+
+        self.instructions = SYSTEM_INSTRUCTION +"\n\n The following is the current UI state. Generate the visual accodingly:\n\n" +"\n".join(md)

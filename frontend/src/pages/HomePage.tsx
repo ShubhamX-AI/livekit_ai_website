@@ -20,7 +20,7 @@ export default function HomePage() {
     const [outboundModalOpen, setOutboundModalOpen] = useState(false);
     const [interactionModalOpen, setInteractionModalOpen] = useState(false);
     const [inboundSettingsOpen, setInboundSettingsOpen] = useState(false);
-    const [selectedAgent, setSelectedAgent] = useState<AgentType>('web');
+    const [selectedAgent, setSelectedAgent] = useState<AgentType>('invoice');
 
     const connect = async (chosenAgent: AgentType) => {
         setConnecting(true);
@@ -125,14 +125,6 @@ export default function HomePage() {
                     )}
 
                     <div className="flex flex-col gap-4 max-w-xs mx-auto w-full">
-                        <AgentButton
-                            label="Indusnet Web Agent"
-                            agentType="web"
-                            onWebCall={handleWebCall}
-                            onOutboundCall={handleOutboundCall}
-                            onMobileClick={handleMobileClick}
-                            disabled={connecting}
-                        />
 
                         <AgentButton
                             label="Invoice Agent"

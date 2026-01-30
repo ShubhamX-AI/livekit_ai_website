@@ -1,15 +1,15 @@
 from livekit.agents import Agent
-from agents.bandhan_banking.bandhan_banking_prompt import BANDHAN_BANKING_AGENT_PROMPT
+from agents.ambuja.ambuja_agent_prompt import AMBUJA_AGENT_PROMPT
 from shared_humanization_prompt.tts_humanification_cartesia import TTS_HUMANIFICATION_CARTESIA
 
-class BandhanBankingAgent(Agent):
+class AmbujaAgent(Agent):
     def __init__(self, room) -> None:
         super().__init__(
             # Instructions for the agent
-            instructions=BANDHAN_BANKING_AGENT_PROMPT + TTS_HUMANIFICATION_CARTESIA,
+            instructions=AMBUJA_AGENT_PROMPT + TTS_HUMANIFICATION_CARTESIA,
         )
         self.room = room
 
     @property
     def welcome_message(self):
-        return ("Hi, This is VYOM your bandhan banking agent.")
+        return ("Namaskar ... Welcome to Ambuja Neotia. I'm Pratik. How can I assist you with Utalika Luxury today? ...")

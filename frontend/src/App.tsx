@@ -92,7 +92,6 @@ export default function App() {
       <Route path="/bank" element={<BankingPage />} />
       <Route path="/jharkhand" element={<JharkhandPage />} />
       <Route path="/invoice" element={<InvoicePage />} />
-      <Route path="/web" element={<LegacyAgentPage agentType="web" />} />
       <Route path="/restaurant" element={<LegacyAgentPage agentType="restaurant" />} />
       <Route path="/realestate" element={<LegacyAgentPage agentType="realestate" />} />
       <Route path="/distributor" element={<LegacyAgentPage agentType="distributor" />} />
