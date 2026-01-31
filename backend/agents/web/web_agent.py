@@ -22,7 +22,7 @@ class Webagent(Agent):
         self.room = room
         self.chroma_client = chromadb.PersistentClient(path="./vector_db")
         self.collection = self.chroma_client.get_or_create_collection(
-            name="indusnet_website"
+            name="indusnet_website_v2"
         )
         self.db_fetch_size = 5
         # UI Context Manager for state tracking and redundancy prevention
@@ -36,11 +36,12 @@ class Webagent(Agent):
             " Tell me how can I help you today?"
         )
 
-    # Refined lookup_website_information tool
+    # Indus Net Knowledge Base Search tool
     @function_tool
-    async def lookup_website_information(self, context: RunContext, question: str):
+    async def search_indus_net_knowledge_base(self, context: RunContext, question: str):
         """
-        Tool used to retrieve Information about Indus Net Technologies. 
+        Search the official Indus Net Knowledge Base for information about the company. 
+        Calling this tool will also trigger a visual update on the user interface.
         """
         logger.info(f"Searching knowledge base for: {question}")
         
@@ -118,18 +119,18 @@ class Webagent(Agent):
     # Get UI context from frontend and update agent instructions
     async def update_ui_context(self, context_payload: dict) -> None:
         """Process UI context sync from frontend and update agent state."""
-        # Extract data from the paylod
+        # Extract data from the payload
         screen = context_payload.get("viewport", {}).get("screen", "desktop")
         theme = context_payload.get("viewport", {}).get("theme", "light")
         max_visible_cards = context_payload.get("viewport", {}).get("capabilities", {}).get("maxVisibleCards", 4)
         active_elements = context_payload.get("active_elements", [])
 
-        # Update the ui agent with the ui context
-        ui_agent_context_playload = {"screen": screen, 
+        # Update the UI agent with the UI context
+        ui_agent_context_payload = {"screen": screen, 
                                      "theme": theme, 
                                      "max_visible_cards": max_visible_cards,
                                      "active_elements": active_elements}
-        await self.ui_agent_functions.update_instructions_with_context(ui_agent_context_playload)
+        await self.ui_agent_functions.update_instructions_with_context(ui_agent_context_payload)
 
 
         # Update the instructions with current active elements/UI state
@@ -142,10 +143,10 @@ class Webagent(Agent):
         if not active_elements:
             return
 
-        # Change the active elements in to markdown
-        active_elements = "\n\n".join(f"- {element}" for element in active_elements)
+        # Change the active elements into markdown
+        active_elements_md = "\n\n".join(f"- {element}" for element in active_elements)
 
-        new_instructions = self._base_instruction + "\n Elements Currently Present in UI: \n" + active_elements
+        new_instructions = self._base_instruction + "\n Elements Currently Present in UI: \n" + active_elements_md
 
         # 🎯 This actually updates the LLM system prompt
         await self.update_instructions(new_instructions)

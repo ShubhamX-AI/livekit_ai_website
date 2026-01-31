@@ -13,7 +13,7 @@ load_dotenv(override=True)
 class UIAgentFunctions:
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.llm_model = "gpt-4.1"
+        self.llm_model = "gpt-4o-mini"
         self.logger = logging.getLogger(__name__)
         self.instructions = SYSTEM_INSTRUCTION
 
@@ -164,10 +164,10 @@ class UIAgentFunctions:
     # Update the instructions with current active elements/UI state
     async def update_instructions_with_context(self, ui_context: dict) -> None:
         
-        logging.info("Updating the instructions with UI context")
-        # Comvert UI context to markdown format
+        logging.info("Updating instructions with UI context")
+        # Convert UI context to markdown format
         md = []
         for key, value in ui_context.items():
             md.append(f"**{key}**: `{json.dumps(value, indent=2) if isinstance(value, (dict, list)) else value}`")
 
-        self.instructions = SYSTEM_INSTRUCTION +"\n\n The following is the current UI state. Generate the visual accodingly:\n\n" +"\n".join(md)
+        self.instructions = SYSTEM_INSTRUCTION + "\n\nThe following is the current UI state. Generate the visual accordingly:\n\n" + "\n".join(md)

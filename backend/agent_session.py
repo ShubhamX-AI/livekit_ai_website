@@ -30,7 +30,7 @@ import json
 import asyncio
 from typing import cast
 from inbound.config_manager import get_agent_for_number
-# from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
+from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
 
 # Recording input
 # from recording.recording import start_audio_recording, record_participant_audio, start_audio_recording2
@@ -92,17 +92,17 @@ async def my_agent(ctx: JobContext):
             modalities=["text"],
             api_key=cast(str, os.getenv("OPENAI_API_KEY")),
         ),
-        tts=cartesia.TTS(
-            model="sonic-3", 
-            voice="f3fc8397-87fe-4d5f-87c7-9467f62a06ac",
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            # volume=1.8
-            ),
-        # tts=ElevenLabsNonStreamingTTS(
-        #     voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
-        #     model="eleven_v3",
-        #     api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
-        # ),
+        # tts=cartesia.TTS(
+        #     model="sonic-3", 
+        #     voice="f3fc8397-87fe-4d5f-87c7-9467f62a06ac",
+        #     api_key=os.getenv("CARTESIA_API_KEY"),
+        #     # volume=1.8
+        #     ),
+        tts=ElevenLabsNonStreamingTTS(
+            voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
+            model="eleven_v3",
+            api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
+        ),
         preemptive_generation=True,
         use_tts_aligned_transcript=False,
     )
@@ -127,6 +127,9 @@ async def my_agent(ctx: JobContext):
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
+                # Using LiveKit's built-in noise cancellation
+                # Note: FFmpeg preprocessing cannot be easily integrated here
+                # due to synchronous API constraints in LiveKit's audio pipeline
                 noise_cancellation=lambda params: noise_cancellation.BVCTelephony()
                 if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
                 else noise_cancellation.BVC(),
