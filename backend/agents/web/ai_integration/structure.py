@@ -14,8 +14,11 @@ class SmartIcon(BaseModel):
 
 
 class DynamicMedia(BaseModel):
-    source: str = "unsplash"  # "unsplash" | "pexels"
-    query: str
+    urls: list[str] | None = None
+    query: str | None = None
+    source: str | None = "unsplash"  # "unsplash" | "pexels"
+    aspectRatio: str | None = "auto" # "auto" | "video" | "square" | "portrait"
+    mediaType: str | None = "image"  # "image" | "video"
 
 
 class Flashcard(BaseModel):
