@@ -27,7 +27,7 @@ class Webagent(Agent):
             embedding_function=self.embeddings,
             collection_name="indus_net_knowledge"
         )
-        self.db_fetch_size = 5
+        self.db_fetch_size = 10
         self.db_results = ""
         # UI Context Manager for state tracking and redundancy prevention
         self.ui_agent_functions = UIAgentFunctions()

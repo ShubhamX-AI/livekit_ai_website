@@ -70,4 +70,4 @@ def ask_bot(query):
     print(cleaned)
 
 if __name__ == "__main__":
-    ask_bot("contact details ?")
+    ask_bot("what are the services")

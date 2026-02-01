@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from agents.web.ai_integration.ui_agent_prompt import SYSTEM_INSTRUCTION
 from agents.web.ai_integration.structure import UIStreamResponse
 from typing import Any, AsyncGenerator
@@ -12,7 +12,7 @@ load_dotenv(override=True)
 
 class UIAgentFunctions:
     def __init__(self):
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.llm_model = "o4-mini"
         self.logger = logging.getLogger(__name__)
         self.instructions = SYSTEM_INSTRUCTION
@@ -40,7 +40,7 @@ class UIAgentFunctions:
                         ## Your Task
                         Generate flashcards for NEW information only. Check active_elements above and skip any content already displayed."""
 
-            with self.openai_client.responses.stream(
+            async with self.openai_client.responses.stream(
                 model=self.llm_model,
                 input=[
                     {"role": "system", "content": self.instructions},
@@ -59,7 +59,7 @@ class UIAgentFunctions:
                 # 1: Parsing Card Objects { ... }
                 state = 0
 
-                for event in stream:
+                async for event in stream:
                     if event.type == "response.output_text.delta":
                         chunk = event.delta
                         buffer += chunk

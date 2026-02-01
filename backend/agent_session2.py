@@ -50,6 +50,7 @@ server = AgentServer(
     api_key=os.getenv("LIVEKIT_API_KEY"),
     api_secret=os.getenv("LIVEKIT_API_SECRET"),
     ws_url=os.getenv("LIVEKIT_URL"),
+    job_memory_warn_mb=1024,
 )
 
 
