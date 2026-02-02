@@ -1,0 +1,16 @@
+name: livekit_demo_frontend
+
+services:
+  frontend:
+    image: shubhamint/livekit_demo_frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3010:80"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"

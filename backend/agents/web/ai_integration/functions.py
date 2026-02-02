@@ -13,7 +13,7 @@ load_dotenv(override=True)
 class UIAgentFunctions:
     def __init__(self):
         self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.llm_model = "o4-mini"
+        self.llm_model = "gpt-5.2"
         self.logger = logging.getLogger(__name__)
         self.instructions = SYSTEM_INSTRUCTION
 
