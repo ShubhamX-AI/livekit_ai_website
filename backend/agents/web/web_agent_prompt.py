@@ -41,7 +41,7 @@ Available_tool:
 
 Available_tool_2:
   name: "publish_ui_stream"
-  description: "Generates and sends visual flashcards to the user's screen. You MUST call this tool immediately after getting results from 'search_indus_net_knowledge_base' if you want to show the information visually. Arguments: user_input, db_results, agent_response."
+  description: "Generates and sends visual flashcards to the user's screen. You MUST call this tool immediately after getting results from 'search_indus_net_knowledge_base' if you want to show the information visually. Arguments: user_input, agent_response."
 
 
 # ===================================================================
