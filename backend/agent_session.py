@@ -233,6 +233,22 @@ async def my_agent(ctx: JobContext):
     welcome_message = agent_instance.welcome_message
     await session.say(text=welcome_message, allow_interruptions=True)
 
+    # --- KEEP ALIVE LOOP ---
+    # Without this, the function returns and the agent process terminates.
+    participant_left = asyncio.Event()
+
+    @ctx.room.on("participant_disconnected")
+    def on_participant_disconnected(p: rtc.RemoteParticipant):
+        if p.identity == participant.identity:
+            logger.info(f"Participant {p.identity} disconnected, ending session.")
+            participant_left.set()
+
+    # Keep the task running until the participant leaves or the room is closed
+    while ctx.room.connection_state == rtc.ConnectionState.CONN_CONNECTED and not participant_left.is_set():
+        await asyncio.sleep(1)
+
+    logger.info("Session ended.")
+
 
 if __name__ == "__main__":
     cli.run_app(server)
