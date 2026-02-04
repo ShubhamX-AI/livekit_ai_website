@@ -183,6 +183,17 @@ async def health():
 # Test SIP
 from sip_test import make_exotel_call
 
+# {
+#   "exotel_ip": "pstn.in4.exotel.com",
+#   "exotel_port": 5070,
+#   "customer_ip": "13.234.150.174",
+#   "customer_port": 5061,
+#   "media_ip": "13.234.150.174",
+#   "rtp_port": 18232,
+#   "caller": "+918044319240",
+#   "callee": "+918697421450"
+# }
+
 @app.post("/api/testsip")
 async def trigger_sip_test_call(data: SIPTestRequest):
     logger.info(f"Received SIP test call request: {data}")
