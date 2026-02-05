@@ -19,5 +19,6 @@ dependencies = [
     "langchain-openai",
     "langchain-chroma>=1.1.0",
     "langchain>=1.2.7",
-    "langchain-community>=0.4.1"
+    "langchain-community>=0.4.1",
+    "onnxruntime>=1.17.0"
 ]

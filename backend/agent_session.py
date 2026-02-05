@@ -122,85 +122,73 @@ async def my_agent(ctx: JobContext):
         ),
     )
 
-    # ---- START SESSION ----
-    await session.start(
-        agent=InvoiceAgent(room=ctx.room),  # Default agent
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                # Using LiveKit's built-in noise cancellation
-                # Note: FFmpeg preprocessing cannot be easily integrated here
-                # due to synchronous API constraints in LiveKit's audio pipeline
-                noise_cancellation=lambda params: noise_cancellation.BVCTelephony()
-                if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                else noise_cancellation.BVC(),
-            ),
-        ),
-    )
+    # --- START SESSION ---
+    logger.info("Starting AgentSession...")
+    try:
+        await session.start(
+            # Start with a generic agent, we update it immediately after determining type
+            agent=InvoiceAgent(room=ctx.room),
+            room=ctx.room,
+            # DELETED: noise_cancellation filters as they require LiveKit Cloud
+        )
+        logger.info("AgentSession started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start AgentSession: {e}", exc_info=True)
+        return
 
     # WAIT for participant
+    logger.info("Waiting for participant...")
     participant = await ctx.wait_for_participant()
     logger.info(
-        f"Participant joined: {participant.identity}, metadata={participant.metadata}"
+        f"Participant joined: {participant.identity}, kind={participant.kind}, metadata={participant.metadata}"
     )
 
     # Determine agent type based on room metadata or fallback to "web"
     agent_type = "web"
-
+    
     # Check if SIP call
     if participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP:
-        # Check sip status for incomming and outgoing
+        logger.info("SIP Participant detected")
         if participant.metadata and participant.metadata.strip():
             try:
                 metadata = json.loads(participant.metadata)
                 if metadata.get("call_type") == "outbound":
-                    logger.info("Outbound call detected")
                     agent_type = metadata.get("agent", "web")
-                    logger.info(f"Agent type from metadata: {agent_type}")
-            except Exception:
-                logger.error(
-                    "Error parsing agent type from metadata. Getting default agent."
-                )
+                    logger.info(f"Outbound SIP call, agent_type={agent_type}")
+            except Exception as e:
+                logger.error(f"Error parsing SIP metadata: {e}")
         else:
-            logger.info("Inbound call detected")
             called_number = participant.attributes.get("sip.trunkPhoneNumber")
-            logger.info(f"Called number: {called_number}")
-            if isinstance(called_number, str) and called_number:
+            logger.info(f"Inbound SIP call to: {called_number}")
+            if called_number:
                 mapped_agent = get_agent_for_number(called_number)
-                logger.info(f"Mapped agent: {mapped_agent}")
                 if mapped_agent:
                     agent_type = mapped_agent
-                    logger.info(f"Using mapped agent {agent_type} for {called_number}")
-            else:
-                logger.info("No SIP trunk phone number available")
-
+                    logger.info(f"Mapped SIP number to agent: {agent_type}")
     else:
         # Web call
         try:
             agent_type = json.loads(participant.metadata).get("agent", "web")
+            logger.info(f"Web call, agent_type={agent_type}")
         except Exception:
-            logger.error(
-                "Error parsing agent type from metadata. Getting default agent."
-            )
+            logger.warning("Could not parse agent_type from web participant metadata, defaulting to 'web'")
 
+    # Initialize the specific Agent Class
     AgentClass = AGENT_TYPES.get(agent_type, Webagent)
-
-    # Agent instance with agent type
+    logger.info(f"Initializing Agent instance for: {agent_type} ({AgentClass.__name__})")
     agent_instance = AgentClass(room=ctx.room)
 
     # Attach the agent to the session
     session.update_agent(agent=agent_instance)
+    logger.info(f"Agent session updated with {agent_type} instance")
 
     # Frontend details for the WEB agent - UI Context Sync
     @ctx.room.on("data_received")
     def _handle_data_received(data: rtc.DataPacket):
-
-        # receive the topic
         topic = getattr(data, "topic", None)
         if topic != "ui.context":
             return
         
-        # Receive the payload
         payload = getattr(data, "data", None)
         if isinstance(payload, bytes):
             payload_text = payload.decode("utf-8", errors="ignore")
@@ -209,34 +197,31 @@ async def my_agent(ctx: JobContext):
         
         try:
             context_payload = json.loads(payload_text)
-        except json.JSONDecodeError:
-            logger.warning("Invalid ui.context payload - JSON parse failed")
-            return
-        
-        logging.info("📱 UI Context Sync received")
-        asyncio.create_task(agent_instance.update_ui_context(context_payload))
+            logger.debug(f"UI Context received: {context_payload}")
+            asyncio.create_task(agent_instance.update_ui_context(context_payload))
+        except Exception as e:
+            logger.warning(f"Failed to process ui.context: {e}")
 
-    # Start recording in a separate task
-    # asyncio.create_task(trigger_recording(ctx.room.name, agent_type))
-    # asyncio.create_task(start_audio_recording2(ctx.room.name, agent_type))
-
-    # --- Background Audio Start (before welcome message) ---
+    # --- Background Audio Start ---
     try:
         asyncio.create_task(
             background_audio.start(room=ctx.room, agent_session=session)
         )
-        logger.info("Background audio task started")
+        logger.info("Background audio task spawned")
     except Exception as e:
-        logger.warning(f"Could not start background audio: {e}", exc_info=True)
+        logger.warning(f"Could not start background audio: {e}")
 
-    # --- INITIATING SPEECH (Dynamically changed based on agent) ---
-    # If agent = ambuja no welcome message
+    # --- INITIATING SPEECH ---
     if agent_type != "ambuja":
         welcome_message = agent_instance.welcome_message
-        await session.say(text=welcome_message, allow_interruptions=True)
+        logger.info(f"Sending welcome message: '{welcome_message}'")
+        try:
+            await session.say(text=welcome_message, allow_interruptions=True)
+            logger.info("Welcome message sent successfully")
+        except Exception as e:
+            logger.error(f"Failed to send welcome message: {e}", exc_info=True)
 
     # --- KEEP ALIVE LOOP ---
-    # Without this, the function returns and the agent process terminates.
     participant_left = asyncio.Event()
 
     @ctx.room.on("participant_disconnected")
@@ -248,6 +233,8 @@ async def my_agent(ctx: JobContext):
     # Keep the task running until the participant leaves or the room is closed
     while ctx.room.connection_state == rtc.ConnectionState.CONN_CONNECTED and not participant_left.is_set():
         await asyncio.sleep(1)
+
+    logger.info(f"Session for participant {participant.identity} ended.")
 
     logger.info("Session ended.")
 

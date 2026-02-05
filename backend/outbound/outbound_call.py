@@ -1,9 +1,10 @@
 import json
 import os
 import logging
-import random
+import uuid
 from typing import Literal
 from livekit import api
+from livekit.api import CreateRoomRequest
 from livekit.protocol.sip import (CreateSIPOutboundTrunkRequest, 
                                   SIPOutboundTrunkInfo, 
                                   ListSIPOutboundTrunkRequest)
@@ -27,7 +28,22 @@ class OutboundCall:
             lkapi = api.LiveKitAPI()
 
             # Ensure unique room name
-            unique_room_name = f"{self.room_name}-{phone_number[-4:]}-{random.randint(1000, 9999)}"
+            unique_room_name = f"{self.room_name}-{phone_number[-4:]}-{uuid.uuid4().hex[:6]}"
+
+            room_request = CreateRoomRequest(
+                name=unique_room_name,
+                empty_timeout=60,           # Close 1 min after last participant
+                max_participants=2,          # Agent + SIP participant only
+                metadata=json.dumps({
+                    "call_type": "outbound",
+                    "agent": agent_type,
+                    "phone": phone_number,
+                    "trunk": call_from
+                })
+            )
+            
+            room = await lkapi.room.create_room(room_request)
+            self.logger.info(f"Created room: {room.name} (sid: {room.sid})")
             
             # Metadata for dispatch
             metadata = json.dumps({"agent": agent_type, "phone": phone_number, "call_type": "outbound"})
