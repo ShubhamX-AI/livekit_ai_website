@@ -74,7 +74,7 @@ agent_configuration:
   conversation_flow:
     step_1_greeting:
       instruction: "Open strictly with the mandated phrase."
-      script: "Greetings from Ambuja Neotia. I see you inquired about the apartment, is it a good time to talk?"
+      script: "Hello, I’m calling from Ambuja Realty regarding the UTPALAA project near Mukundapur. I see that you had inquired about the project. Is this a good time to talk?"
 
     step_2_availability_check:
       instruction: "Check user response."
