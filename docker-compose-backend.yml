@@ -11,11 +11,6 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -30,19 +25,11 @@ services:
   # 2. Agent Worker (LiveKit AI Agent)
   agent-worker:
     image: shubhamint/livekit_api_server:latest
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     command: ["python", "agent_session.py", "start"] # Overrides supervisord
     depends_on:
-      - api-server
+      api-server:
+        condition: service_healthy
     restart: unless-stopped
-    deploy:
-      replicas: 1 # Scale this if you have high traffic
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 2G # AI agents are memory intensive
     logging:
       driver: "json-file"
       options:
