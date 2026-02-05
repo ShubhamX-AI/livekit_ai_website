@@ -85,18 +85,21 @@ async def my_agent(ctx: JobContext):
 
     try:
         # --- 3. SESSION SETUP ---
-        session = AgentSession(
-            llm=realtime.RealtimeModel(
-                turn_detection=TurnDetection(
-                    type="semantic_vad",
-                    create_response=True,
-                    interrupt_response=True,
-                    idle_timeout_ms=30000
-                ),
-                modalities=['text'],
-                api_key=os.getenv("OPENAI_API_KEY")
+        llm = realtime.RealtimeModel(
+            turn_detection=TurnDetection(
+                type="semantic_vad",
+                create_response=True,
+                interrupt_response=True,
+                idle_timeout_ms=30000
             ),
-            tts=inference.TTS(model="cartesia/sonic-3", voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f"),
+            modalities=['text'],
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+        tts = inference.TTS(model="cartesia/sonic-3", voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f")
+        
+        session = AgentSession(
+            llm=llm,
+            tts=tts,
             # tts=cartesia.TTS(model="sonic-3", voice="209d9a43-03eb-40d8-a7b7-51a6d54c052f", api_key=os.getenv("CARTESIA_API_KEY")),
             vad=silero.VAD.load(min_speech_duration=0.3),
         )
@@ -138,6 +141,16 @@ async def my_agent(ctx: JobContext):
     finally:
         # --- 5. FINISH AND MERGE ---
         logger.info("Participant left. Wrapping up recordings...")
+
+        # Explicitly close models and session
+        try:
+            await session.aclose()
+            await llm.aclose()
+            if hasattr(tts, "aclose"):
+                await tts.aclose()
+            logger.info("Resources cleaned up (session, llm, tts closed).")
+        except Exception as cleanup_err:
+            logger.warning(f"Error during resource cleanup: {cleanup_err}")
         
         # Wait for both recording tasks to finish writing to disk
         if recording_tasks:
