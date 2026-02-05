@@ -7,7 +7,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3010:80"
+      - "3009:80"
 
     logging:
       driver: "json-file"
