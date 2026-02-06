@@ -28,12 +28,12 @@ class OutboundCall:
             lkapi = api.LiveKitAPI()
 
             # Ensure unique room name
-            unique_room_name = f"{agent_type}-{phone_number[-4:]}-{uuid.uuid4().hex[:6]}"
+            unique_room_name = f"{agent_type}-outbound-{phone_number[-4:]}-{uuid.uuid4().hex[:6]}"
 
             room_request = CreateRoomRequest(
                 name=unique_room_name,
                 empty_timeout=60,           # Close 1 min after last participant
-                max_participants=2,          # Agent + SIP participant only
+                max_participants=3,          # Agent + SIP participant only
                 metadata=json.dumps({
                     "call_type": "outbound",
                     "agent": agent_type,

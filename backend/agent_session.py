@@ -1,9 +1,7 @@
 import logging
 from dotenv import load_dotenv
 from livekit import rtc
-from livekit.plugins import silero
 from livekit.agents import (
-    AgentServer,
     AgentSession,
     JobContext,
     WorkerOptions,
@@ -23,10 +21,8 @@ from agents.ambuja.ambuja_agent import AmbujaAgent
 from openai.types.beta.realtime.session import TurnDetection
 from livekit.plugins import cartesia
 from livekit.plugins.openai import realtime
-from utils.elevenlabs_nonstream_tts import ElevenLabsNonStreamingTTS
 from openai.types.realtime import AudioTranscription
 import os
-import json
 import asyncio
 from typing import cast
 
@@ -48,16 +44,6 @@ AGENT_TYPES = {
 }
 
 
-# initialize the agent
-server = AgentServer(
-    api_key=os.getenv("LIVEKIT_API_KEY"),
-    api_secret=os.getenv("LIVEKIT_API_SECRET"),
-    ws_url=os.getenv("LIVEKIT_URL"),
-    job_memory_warn_mb=1024,
-)
-
-
-@server.rtc_session()
 async def vyom_demos(ctx: JobContext):
 
     # Retrive agent name from room name
@@ -96,11 +82,6 @@ async def vyom_demos(ctx: JobContext):
         voice="f6141af3-5f94-418c-80ed-a45d450e7e2e",
         api_key=os.getenv("CARTESIA_API_KEY"),
         )
-    # tts=ElevenLabsNonStreamingTTS(
-    #     voice_id="kL8yauEAuyf6botQt9wa",  # Monika - Indian Female
-    #     model="eleven_v3",
-    #     api_key=cast(str, os.getenv("ELEVENLABS_API_KEY")),
-    # )
     
     session = AgentSession(
         llm=llm,
@@ -112,6 +93,18 @@ async def vyom_demos(ctx: JobContext):
     # --- START SESSION ---
     logger.info("Starting AgentSession...")
     try:
+
+        # --- Background Audio Start ---
+        background_audio = BackgroundAudioPlayer(
+            ambient_sound=AudioConfig(
+                os.path.join(os.path.dirname(__file__), "bg_audio", "office-ambience_48k.wav"),
+                volume=0.4,
+            ),
+            thinking_sound=AudioConfig(
+                os.path.join(os.path.dirname(__file__), "bg_audio", "typing-sound_48k.wav"),
+                volume=0.5,
+            ),
+        )
 
         # Configure room options
         room_options = room_io.RoomOptions(
@@ -136,61 +129,19 @@ async def vyom_demos(ctx: JobContext):
             f"Participant joined: {participant.identity}, kind={participant.kind}, metadata={participant.metadata}"
         )
 
-        # Check if this is an outbound call (SIP)
-        is_outbound = "outbound" in room_name or (participant.metadata and "outbound" in participant.metadata)
-        if is_outbound:
-            logger.info("Outbound call detected. Waiting for user to answer (audio track)...")
-            
-            # Event to signal when the participant's audio track is subscribed
-            audio_track_subscribed = asyncio.Event()
-
-            @ctx.room.on("track_subscribed")
-            def on_track_subscribed(track: rtc.Track, publication: rtc.TrackPublication, p: rtc.RemoteParticipant):
-                if p.identity == participant.identity and track.kind == rtc.TrackKind.KIND_AUDIO:
-                    logger.info("Call answered! Audio track subscribed.")
-                    audio_track_subscribed.set()
-
-            # Check if track is already subscribed (edge case)
-            for pub in participant.track_publications.values():
-                if pub.track and pub.track.kind == rtc.TrackKind.KIND_AUDIO:
-                    audio_track_subscribed.set()
-                    break
-
-            try:
-                # Wait up to 45s for the call to be answered
-                await asyncio.wait_for(audio_track_subscribed.wait(), timeout=45.0)
-                logger.info("SIP media stabilization complete (call answered).")
-            except asyncio.TimeoutError:
-                logger.warning("Timed out waiting for SIP answer. Proceeding to speak anyway.")
-
-
         # --- Background Audio Start ---
-        background_audio = BackgroundAudioPlayer(
-            ambient_sound=AudioConfig(
-                os.path.join(os.path.dirname(__file__), "bg_audio", "office-ambience_48k.wav"),
-                volume=0.4,
-            ),
-            thinking_sound=AudioConfig(
-                os.path.join(os.path.dirname(__file__), "bg_audio", "typing-sound_48k.wav"),
-                volume=0.5,
-            ),
-        )
-        try:
-            asyncio.create_task(
-                background_audio.start(room=ctx.room, agent_session=session)
-            )
-            logger.info("Background audio task spawned")
-        except Exception as e:
-            logger.warning(f"Could not start background audio: {e}")
+        asyncio.create_task(background_audio.start(room=ctx.room, agent_session=session))
+        logger.info("Background audio task spawned")
 
         # --- INITIATING SPEECH ---
-        welcome_message = agent_instance.welcome_message
-        logger.info(f"Sending welcome message: '{welcome_message}' for agent: {agent_type}")
-        try:
-            await session.say(text=welcome_message, allow_interruptions=True)
-            logger.info("Welcome message sent successfully")
-        except Exception as e:
-            logger.error(f"Failed to send welcome message: {e}", exc_info=True)
+        if agent_type != "ambuja":
+            welcome_message = agent_instance.welcome_message
+            logger.info(f"Sending welcome message: '{welcome_message}' for agent: {agent_type}")
+            try:
+                await session.say(text=welcome_message, allow_interruptions=True)
+                logger.info("Welcome message sent successfully")
+            except Exception as e:
+                logger.error(f"Failed to send welcome message: {e}", exc_info=True)
 
         # --- KEEP ALIVE LOOP ---
         participant_left = asyncio.Event()
