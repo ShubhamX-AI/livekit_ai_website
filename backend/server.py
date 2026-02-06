@@ -60,6 +60,36 @@ async def get_rooms() -> list[str]:
         logger.info("Closed LiveKitAPI client in get_rooms")
 
 
+async def dispatch_request(room: str, agent: str):
+    logger.info(f"Dispatching agent={agent} to room={room}")
+
+    lkapi = LiveKitAPI(
+        os.getenv("LIVEKIT_URL"),
+        os.getenv("LIVEKIT_API_KEY"),
+        os.getenv("LIVEKIT_API_SECRET"),
+    )
+
+    try:
+        await lkapi.agent_dispatch.create_dispatch(
+            lk_api.CreateAgentDispatchRequest(
+                room=room,
+                agent_name=agent,
+                metadata=json.dumps({
+                    "agent": agent,
+                    "source": "token_server"
+                }),
+            )
+        )
+        logger.info(f"Agent dispatched | agent={agent} room={room}")
+
+    except Exception as e:
+        logger.error(f"Agent dispatch failed: {e}", exc_info=True)
+
+    finally:
+        await lkapi.aclose()
+
+
+
 async def create_room(room_name: str, agent: str) -> None:
     logger.info(f"Creating room: {room_name}")
     lkapi = LiveKitAPI(
@@ -88,6 +118,7 @@ async def generate_room_name(agent: str) -> str:
     """
     room_name = f"{agent}-{uuid.uuid4().hex[:8]}"
     await create_room(room_name, agent)
+    await dispatch_request(room_name, "vyom_demos")
     return room_name
         
     # while True:

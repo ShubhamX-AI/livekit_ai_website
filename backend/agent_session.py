@@ -6,6 +6,7 @@ from livekit.agents import (
     AgentServer,
     AgentSession,
     JobContext,
+    WorkerOptions,
     cli,
     room_io,
     BackgroundAudioPlayer,
@@ -57,7 +58,7 @@ server = AgentServer(
 
 
 @server.rtc_session()
-async def my_agent(ctx: JobContext):
+async def vyom_demos(ctx: JobContext):
 
     # Retrive agent name from room name
     room_name = ctx.room.name
@@ -188,13 +189,6 @@ async def my_agent(ctx: JobContext):
         # --- PROPER CLEANUP ---
         logger.info("Cleaning up resources...")
         
-        # Cancel background audio first
-        bg_task.cancel()
-        try:
-            await bg_task
-        except asyncio.CancelledError:
-            pass
-        
         # Close in dependency order
         await session.aclose()
         await llm.aclose()
@@ -203,4 +197,9 @@ async def my_agent(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(server)
+    cli.run_app(
+        WorkerOptions(
+            entrypoint_fnc=vyom_demos,
+            agent_name="vyom_demos",
+        )
+    )

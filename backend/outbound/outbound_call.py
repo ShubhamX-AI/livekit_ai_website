@@ -52,7 +52,7 @@ class OutboundCall:
             
             dispatch = await lkapi.agent_dispatch.create_dispatch(
                 api.CreateAgentDispatchRequest(
-                    agent_name=agent_type, room=unique_room_name, metadata=metadata
+                    agent_name="vyom_demos", room=unique_room_name, metadata=metadata
                 )
             )
 
