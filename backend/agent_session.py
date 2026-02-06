@@ -139,9 +139,29 @@ async def vyom_demos(ctx: JobContext):
         # Check if this is an outbound call (SIP)
         is_outbound = "outbound" in room_name or (participant.metadata and "outbound" in participant.metadata)
         if is_outbound:
-            logger.info("Outbound call detected. Waiting 2 seconds for SIP media stabilization...")
-            await asyncio.sleep(2)
-            logger.info("SIP media stabilization wait complete.")
+            logger.info("Outbound call detected. Waiting for user to answer (audio track)...")
+            
+            # Event to signal when the participant's audio track is subscribed
+            audio_track_subscribed = asyncio.Event()
+
+            @ctx.room.on("track_subscribed")
+            def on_track_subscribed(track: rtc.Track, publication: rtc.TrackPublication, p: rtc.RemoteParticipant):
+                if p.identity == participant.identity and track.kind == rtc.TrackKind.KIND_AUDIO:
+                    logger.info("Call answered! Audio track subscribed.")
+                    audio_track_subscribed.set()
+
+            # Check if track is already subscribed (edge case)
+            for pub in participant.track_publications.values():
+                if pub.track and pub.track.kind == rtc.TrackKind.KIND_AUDIO:
+                    audio_track_subscribed.set()
+                    break
+
+            try:
+                # Wait up to 45s for the call to be answered
+                await asyncio.wait_for(audio_track_subscribed.wait(), timeout=45.0)
+                logger.info("SIP media stabilization complete (call answered).")
+            except asyncio.TimeoutError:
+                logger.warning("Timed out waiting for SIP answer. Proceeding to speak anyway.")
 
 
         # --- Background Audio Start ---
