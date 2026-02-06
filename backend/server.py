@@ -8,8 +8,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, JSONResponse
-from livekit import api as lk_api
-from livekit.api import LiveKitAPI, ListRoomsRequest , CreateRoomRequest
+from livekit.api import (
+    LiveKitAPI, 
+    ListRoomsRequest, 
+    CreateRoomRequest, 
+    AccessToken, 
+    VideoGrants, 
+    CreateAgentDispatchRequest
+)
 from pydantic import BaseModel
 from api_data_structure.structure import OutboundCallRequest, OutboundTrunkCreate, SIPTestRequest
 import asyncio
@@ -43,20 +49,20 @@ outbound_call = OutboundCall()
 
 async def get_rooms() -> list[str]:
     logger.info("Starting get_rooms")
-    client = LiveKitAPI(
+    lkapi = LiveKitAPI(
         os.getenv("LIVEKIT_URL"),
         os.getenv("LIVEKIT_API_KEY"),
         os.getenv("LIVEKIT_API_SECRET"),
     )
     try:
-        rooms = await client.room.list_rooms(ListRoomsRequest())
+        rooms = await lkapi.room.list_rooms(ListRoomsRequest())
         logger.info(f"Retrieved rooms: {[room.name for room in rooms.rooms]}")
         return [room.name for room in rooms.rooms]
     except Exception as e:
         logger.error(f"Error in get_rooms: {e}", exc_info=True)
         return []
     finally:
-        await client.aclose()
+        await lkapi.aclose()
         logger.info("Closed LiveKitAPI client in get_rooms")
 
 
@@ -71,7 +77,7 @@ async def dispatch_request(room: str, agent: str):
 
     try:
         await lkapi.agent_dispatch.create_dispatch(
-            lk_api.CreateAgentDispatchRequest(
+            CreateAgentDispatchRequest(
                 room=room,
                 agent_name=agent,
                 metadata=json.dumps({
@@ -143,12 +149,12 @@ async def get_token(name: str = Query("guest"), agent: str = Query("web") ,room:
 
     try:
         token = (
-            lk_api.AccessToken(os.getenv("LIVEKIT_API_KEY"), os.getenv("LIVEKIT_API_SECRET"))
+            AccessToken(os.getenv("LIVEKIT_API_KEY"), os.getenv("LIVEKIT_API_SECRET"))
             .with_identity(name)
             .with_name(name)
             .with_metadata(json.dumps({"agent": agent}))
             .with_grants(
-                lk_api.VideoGrants(
+                VideoGrants(
                     room_join=True,
                     room=room,
                 )
