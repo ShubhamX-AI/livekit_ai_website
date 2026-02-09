@@ -34,7 +34,9 @@ LK_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 class RTPBridge:
     def __init__(self, local_port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("0.0.0.0", local_port))
+        self.sock.bind(("0.0.0.0", 0))  # Bind to any available port
+        self.port = self.sock.getsockname()[1]
+        logger.info(f"RTP Bridge bound to local port: {self.port}")
         self.sock.setblocking(False)
         self.remote_addr = None
         self.running = False
@@ -141,7 +143,7 @@ class SipClient:
         self.branch = f"z9hG4bK-{uuid.uuid4().hex}"
         self.tag = f"trunk{random.randint(10000, 99999)}"
         self.call_id = str(uuid.uuid4())
-        self.rtp_bridge = RTPBridge(RTP_PORT)
+        self.rtp_bridge = RTPBridge(0) # Port assigned dynamically
 
     def _build_invite(self):
         sdp = f"""v=0
@@ -149,7 +151,7 @@ o=- {random.randint(1000000000, 2000000000)} {random.randint(1000000000, 2000000
 s=-
 c=IN IP4 {MEDIA_IP}
 t=0 0
-m=audio {RTP_PORT} RTP/AVP 0 101
+m=audio {self.rtp_bridge.port} RTP/AVP 0 101
 a=rtpmap:0 PCMU/8000
 a=rtpmap:101 telephone-event/8000
 a=fmtp:101 0-15
