@@ -221,6 +221,16 @@ export default function HomePage() {
                         onMobileClick={handleMobileClick}
                         disabled={connecting}
                     />
+
+                    <AgentButton
+                        label="Hirebot Agent"
+                        description="Your spanish agent"
+                        agentType="hirebot"
+                        onWebCall={handleWebCall}
+                        onOutboundCall={handleOutboundCall}
+                        onMobileClick={handleMobileClick}
+                        disabled={connecting}
+                    />
                 </div>
 
                 {/* Bottom Trust Section */}
