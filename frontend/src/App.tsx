@@ -98,6 +98,7 @@ export default function App() {
       <Route path="/distributor" element={<LegacyAgentPage agentType="distributor" />} />
       <Route path="/bandhan_banking" element={<BandhanBankingPage />} />
       <Route path="/ambuja" element={<AmbujaPage />} />
+      <Route path="/hirebot" element={<LegacyAgentPage agentType="hirebot" />} />
     </Routes>
   );
 }

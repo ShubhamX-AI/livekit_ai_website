@@ -14,7 +14,9 @@ const AGENT_OPTIONS = [
     { value: 'bank', label: 'Banking Agent' },
     { value: 'tour', label: 'Tour Agent' },
     { value: 'realestate', label: 'Real Estate Agent' },
-    { value: 'bandhan_banking', label: 'Bandhan Banking Agent' },   
+    { value: 'bandhan_banking', label: 'Bandhan Banking Agent' },
+    { value: 'hirebot', label: 'Hirebot Agent' }, 
+
 ];
 
 export function InboundSettingsModal({ isOpen, onClose }: InboundSettingsModalProps) {
