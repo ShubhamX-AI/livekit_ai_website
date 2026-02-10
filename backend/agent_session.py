@@ -80,7 +80,7 @@ async def vyom_demos(ctx: JobContext):
     )
     tts = cartesia.TTS(
         model="sonic-3", 
-        voice=os.getenv("CARTESIA_VOICE_ID", ""),
+        voice=os.getenv("CARTESIA_VOICE_ID", "") if agent_type != "hirebot" else os.getenv("CARTESIA_VOICE_ID_HIREBOT", ""),
         api_key=os.getenv("CARTESIA_API_KEY", ""),
         )
     
