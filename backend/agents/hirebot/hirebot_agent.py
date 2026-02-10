@@ -12,4 +12,4 @@ class HirebotAgent(Agent):
 
     @property
     def welcome_message(self):
-        return ("Hello")
+        return ("Hello , I am calling from Hirebot.")
