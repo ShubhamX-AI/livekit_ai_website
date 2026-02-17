@@ -106,15 +106,22 @@ class RTPMediaBridge:
         """
         Args:
             bind_ip: IP address to bind the UDP socket to.
-                     Use '0.0.0.0' to bind on all interfaces (recommended for NAT).
             bind_port: Port to bind to. 0 = OS assigns a free port.
         """
-        # Create and bind UDP socket — always bind to 0.0.0.0 for NAT compatibility
+        # Create and bind UDP socket
+        # Bind to the specified IP (use the public media IP so outbound
+        # UDP packets have the correct source address for Exotel)
+        actual_bind = bind_ip if bind_ip != '0.0.0.0' else '0.0.0.0'
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.bind(('0.0.0.0', bind_port))
+        try:
+            self._sock.bind((bind_ip, bind_port))
+        except OSError as e:
+            logger.warning(f"[RTP] Cannot bind to {bind_ip}:{bind_port} ({e}), falling back to 0.0.0.0")
+            self._sock.bind(('0.0.0.0', bind_port))
         self._sock.setblocking(False)
 
         self.local_port = self._sock.getsockname()[1]
+        bound_addr = self._sock.getsockname()
         self._bind_ip = bind_ip
         self._remote_addr: tuple[str, int] | None = None
         self._running = False
@@ -135,9 +142,13 @@ class RTPMediaBridge:
         # Diagnostics
         self._packets_received = 0
         self._packets_sent = 0
+        self._frames_received_from_lk = 0
+        self._frames_dropped_no_remote = 0
         self._first_packet_logged = False
+        self._first_send_logged = False
+        self._first_frame_logged = False
 
-        logger.info(f"[RTP] Bridge bound to {bind_ip}:{self.local_port}")
+        logger.info(f"[RTP] Bridge bound to {bound_addr[0]}:{bound_addr[1]} (requested {bind_ip}:{bind_port})")
 
     def set_remote_endpoint(self, ip: str, port: int):
         """Set the remote RTP endpoint (parsed from the SDP in the 200 OK response)."""
@@ -224,7 +235,29 @@ class RTPMediaBridge:
         Args:
             frame: AudioFrame from the agent's audio track (typically 48kHz mono).
         """
+        self._frames_received_from_lk += 1
+
+        # Log first frame for diagnostics
+        if not self._first_frame_logged:
+            raw_check = bytes(frame.data.cast("b"))
+            max_val = audioop.max(raw_check, 2) if len(raw_check) >= 2 else 0
+            logger.info(
+                f"[RTP] ▶ First LiveKit frame received: "
+                f"sample_rate={frame.sample_rate}, "
+                f"channels={frame.num_channels}, "
+                f"samples_per_channel={frame.samples_per_channel}, "
+                f"pcm_bytes={len(raw_check)}, "
+                f"max_amplitude={max_val}"
+            )
+            self._first_frame_logged = True
+
         if not self._remote_addr:
+            self._frames_dropped_no_remote += 1
+            if self._frames_dropped_no_remote % 500 == 1:
+                logger.debug(
+                    f"[RTP] Dropping frame — no remote endpoint yet "
+                    f"(dropped: {self._frames_dropped_no_remote})"
+                )
             return
 
         try:
@@ -259,8 +292,21 @@ class RTPMediaBridge:
             self._sock.sendto(packet, self._remote_addr)
             self._packets_sent += 1
 
+            # Log first outbound packet with full details
+            if not self._first_send_logged:
+                local_addr = self._sock.getsockname()
+                logger.info(
+                    f"[RTP] ▶ First RTP packet SENT: "
+                    f"from={local_addr[0]}:{local_addr[1]} → "
+                    f"to={self._remote_addr[0]}:{self._remote_addr[1]}, "
+                    f"pkt_size={len(packet)}, "
+                    f"payload_size={len(ulaw_payload)}, "
+                    f"seq={self._rtp_seq}, ts={self._rtp_ts}, ssrc={self._rtp_ssrc}"
+                )
+                self._first_send_logged = True
+
         except Exception as e:
-            logger.error(f"[RTP] Outbound send error: {e}")
+            logger.error(f"[RTP] Outbound send error: {e}", exc_info=True)
 
     def stop(self):
         """Stop the RTP bridge and close the UDP socket."""
@@ -571,20 +617,41 @@ async def _forward_agent_audio_to_rtp(
 
     This runs as a long-lived async task for the duration of the call.
     """
-    logger.info(f"[BRIDGE] Starting audio forward: {participant_identity} → RTP")
+    logger.info(
+        f"[BRIDGE] Starting audio forward: {participant_identity} → RTP "
+        f"(track kind={track.kind}, sid={track.sid})"
+    )
 
     audio_stream = rtc.AudioStream(track, sample_rate=SAMPLE_RATE_LK, num_channels=1)
+    frame_count = 0
+    last_log_time = asyncio.get_event_loop().time()
 
     try:
         async for event in audio_stream:
+            frame_count += 1
             await rtp_bridge.send_to_rtp(event.frame)
+
+            # Periodic diagnostics every 5 seconds
+            now = asyncio.get_event_loop().time()
+            if now - last_log_time >= 5.0:
+                logger.info(
+                    f"[BRIDGE] Audio forward stats | {participant_identity}: "
+                    f"lk_frames={frame_count}, "
+                    f"rtp_sent={rtp_bridge._packets_sent}, "
+                    f"rtp_recv={rtp_bridge._packets_received}, "
+                    f"dropped_no_remote={rtp_bridge._frames_dropped_no_remote}"
+                )
+                last_log_time = now
     except asyncio.CancelledError:
         logger.info(f"[BRIDGE] Audio forward cancelled for {participant_identity}")
     except Exception as e:
-        logger.error(f"[BRIDGE] Audio forward error: {e}")
+        logger.error(f"[BRIDGE] Audio forward error: {e}", exc_info=True)
     finally:
         await audio_stream.aclose()
-        logger.info(f"[BRIDGE] Audio forward ended for {participant_identity}")
+        logger.info(
+            f"[BRIDGE] Audio forward ended for {participant_identity}. "
+            f"Total frames forwarded: {frame_count}"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -620,8 +687,10 @@ async def run_bridge(
     logger.info(f"[BRIDGE] Starting bridge for {phone_number} in room {room_name}")
 
     # ── Initialize components ───────────────────────────────────────────
-    # Bind to 0.0.0.0 (the SDP still advertises EXOTEL_MEDIA_IP as the public address)
-    rtp_bridge = RTPMediaBridge(bind_ip='0.0.0.0')
+    # Bind to EXOTEL_MEDIA_IP so outbound RTP packets have the correct source
+    # IP matching what we advertise in the SDP. If the machine can't bind to
+    # this IP (e.g. running locally), it falls back to 0.0.0.0 automatically.
+    rtp_bridge = RTPMediaBridge(bind_ip=EXOTEL_MEDIA_IP)
     sip_client = ExotelSipClient(callee=phone_number, rtp_port=rtp_bridge.local_port)
 
     room = rtc.Room()
@@ -645,15 +714,20 @@ async def run_bridge(
         ):
             if track.kind == rtc.TrackKind.KIND_AUDIO:
                 # CRITICAL: Only forward ONE audio track per agent.
-                # The agent may publish multiple audio tracks:
-                #   1. Main agent speech (TTS output)
-                #   2. BackgroundAudioPlayer ambient/thinking sounds
-                # If we forward ALL of them, the RTP sequence numbers and
-                # timestamps get interleaved/corrupted, causing blank audio
-                # on the phone.
+                # Specifically, we must forward the MICROPHONE track (main speech).
+                # BackgroundAudioPlayer often publishes tracks with SOURCE_UNKNOWN or custom names.
+                # If we latch onto the background track first, we block the agent's voice.
+                
+                if publication.source != rtc.TrackSource.SOURCE_MICROPHONE:
+                    logger.warning(
+                        f"[BRIDGE] Skipping non-microphone audio track from {participant.identity} "
+                        f"(track: {publication.sid}, source: {publication.source})"
+                    )
+                    return
+
                 if participant.identity in forwarded_agents:
                     logger.warning(
-                        f"[BRIDGE] Skipping duplicate audio track from {participant.identity} "
+                        f"[BRIDGE] Skipping duplicate microphone track from {participant.identity} "
                         f"(track: {publication.sid}) — already forwarding one track"
                     )
                     return
