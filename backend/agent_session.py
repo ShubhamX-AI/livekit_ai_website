@@ -24,6 +24,7 @@ from livekit.plugins import cartesia
 from livekit.plugins.openai import realtime
 from openai.types.realtime import AudioTranscription
 import os
+import json
 import asyncio
 
 
@@ -128,14 +129,30 @@ async def vyom_demos(ctx: JobContext):
         participant = await ctx.wait_for_participant()
 
         is_sip = participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-        logger.info(f"Participant joined: {participant.identity}, kind={participant.kind}, is_sip={is_sip}")
+
+        # Also detect Exotel bridge participants (they join as regular WebRTC
+        # participants with metadata containing "source": "exotel_bridge")
+        is_exotel_bridge = False
+        if participant.metadata:
+            try:
+                meta = json.loads(participant.metadata)
+                is_exotel_bridge = meta.get("source") == "exotel_bridge"
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        is_phone_call = is_sip or is_exotel_bridge
+        logger.info(
+            f"Participant joined: {participant.identity}, "
+            f"kind={participant.kind}, is_sip={is_sip}, "
+            f"is_exotel_bridge={is_exotel_bridge}"
+        )
 
         audio_ready = asyncio.Event()
 
         @ctx.room.on("track_published")
         def on_track_published(publication: rtc.RemoteTrackPublication, p: rtc.RemoteParticipant):
             if p.identity == participant.identity and publication.kind == rtc.TrackKind.KIND_AUDIO:
-                logger.info("SIP audio track published — call answered")
+                logger.info("SIP/Bridge audio track published — call answered")
                 audio_ready.set()
 
         # --- Background Audio Start ---
@@ -152,8 +169,8 @@ async def vyom_demos(ctx: JobContext):
 
         # --- INITIATING SPEECH ---
         if agent_type != "ambuja":
-            if is_sip:
-                logger.info("Waiting for SIP call to be answered...")
+            if is_phone_call:
+                logger.info("Waiting for phone call to be answered (SIP or Exotel bridge)...")
                 await audio_ready.wait()
                 # Buffer for RTP stabilization - longer delay ensures welcome message is heard
                 await asyncio.sleep(2.0)

@@ -77,16 +77,25 @@ class OutboundCall:
 
             
             if call_from == "exotel":
-                # Use custom SIP bridge
-                self.logger.info(f"Triggering SIP Bridge for {phone_number} with agent {agent_type}")
+                # Use custom SIP bridge — pass the EXISTING room name
+                # so the bridge joins the same room where the agent was dispatched.
+                self.logger.info(
+                    f"Triggering SIP Bridge for {phone_number} "
+                    f"with agent {agent_type} in room {unique_room_name}"
+                )
                 
-                # Spawn bridge task
-                asyncio.create_task(run_bridge(phone_number, agent_type))
+                asyncio.create_task(
+                    run_bridge(
+                        phone_number=phone_number,
+                        agent_type=agent_type,
+                        room_name=unique_room_name,
+                    )
+                )
                 
                 return format_success_response(
                     message="SIP Bridge Initiated",
                     data={
-                        "participant": {"name": "SIP Bridge"},
+                        "room": unique_room_name,
                         "call_to_phone_number": phone_number,
                         "agent": agent_type,
                         "method": "custom_bridge"
