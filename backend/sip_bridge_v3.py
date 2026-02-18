@@ -157,6 +157,7 @@ class RTPMediaBridge:
         self._public_ip = public_ip
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024 * 1024)
         self._sock.bind(('0.0.0.0', bind_port))
         self._sock.setblocking(False)
         self.local_port = self._sock.getsockname()[1]
@@ -244,7 +245,8 @@ class RTPMediaBridge:
                     num_channels=1,
                     samples_per_channel=len(pcm48) // 2,
                 )
-                await self._audio_source.capture_frame(frame)
+                # Fire and forget — don't block recv_loop on LiveKit backpressure
+                asyncio.ensure_future(self._audio_source.capture_frame(frame))
             except Exception as e:
                 logger.error(f"[RTP] Decode error: {e}")
 
