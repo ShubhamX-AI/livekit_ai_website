@@ -191,7 +191,7 @@ async def health():
     return "ok"
 
 # Test SIP
-from sip_test3 import make_exotel_call
+from sip_test import make_exotel_call
 
 # {
 #   "exotel_ip": "pstn.in4.exotel.com",
