@@ -593,6 +593,31 @@ class ExotelSipClient:
             except Exception as e:
                 logger.warning(f"[SIP] Error sending BYE: {e}")
 
+    async def wait_for_disconnection(self):
+        """Wait for the TCP connection to close or a BYE to be received from Exotel.
+        
+        This allows the bridge to detect when the phone user hangs up.
+        """
+        if not self._reader:
+            return
+
+        try:
+            while True:
+                data = await self._reader.read(4096)
+                if not data:
+                    logger.info("[SIP] Remote closed TCP connection")
+                    break
+                
+                # Check for BYE message in the SIP stream
+                if b"BYE " in data:
+                    logger.info("[SIP] Received BYE from remote")
+                    # Break to trigger cleanup
+                    break
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.debug(f"[SIP] Disconnection monitor error: {e}")
+
     async def close(self):
         """Close the SIP TCP connection."""
         if self._writer and not self._writer.is_closing():
@@ -624,24 +649,11 @@ async def _forward_agent_audio_to_rtp(
 
     audio_stream = rtc.AudioStream(track, sample_rate=SAMPLE_RATE_LK, num_channels=1)
     frame_count = 0
-    last_log_time = asyncio.get_event_loop().time()
 
     try:
         async for event in audio_stream:
             frame_count += 1
             await rtp_bridge.send_to_rtp(event.frame)
-
-            # Periodic diagnostics every 5 seconds
-            now = asyncio.get_event_loop().time()
-            if now - last_log_time >= 5.0:
-                logger.info(
-                    f"[BRIDGE] Audio forward stats | {participant_identity}: "
-                    f"lk_frames={frame_count}, "
-                    f"rtp_sent={rtp_bridge._packets_sent}, "
-                    f"rtp_recv={rtp_bridge._packets_received}, "
-                    f"dropped_no_remote={rtp_bridge._frames_dropped_no_remote}"
-                )
-                last_log_time = now
     except asyncio.CancelledError:
         logger.info(f"[BRIDGE] Audio forward cancelled for {participant_identity}")
     except Exception as e:
@@ -811,16 +823,21 @@ async def run_bridge(
             f"LiveKit room '{room_name}' and phone {phone_number}"
         )
 
-        # Monitor connection health
-        while room.connection_state == rtc.ConnectionState.CONN_CONNECTED:
-            await asyncio.sleep(2)
+        # Monitor SIP disconnection in the background
+        sip_monitor_task = asyncio.create_task(sip_client.wait_for_disconnection())
 
-            # Periodic diagnostics (every ~30 seconds)
-            if rtp_bridge._packets_received % 1500 == 0 and rtp_bridge._packets_received > 0:
-                logger.info(
-                    f"[BRIDGE] Status: RX={rtp_bridge._packets_received}, "
-                    f"TX={rtp_bridge._packets_sent}"
-                )
+        try:
+            # Monitor connection health
+            while room.connection_state == rtc.ConnectionState.CONN_CONNECTED:
+                # If the phone hangs up, terminate the bridge
+                if sip_monitor_task.done():
+                    logger.info("[BRIDGE] SIP call ended by remote — terminating bridge")
+                    break
+
+                await asyncio.sleep(2)
+        finally:
+            if not sip_monitor_task.done():
+                sip_monitor_task.cancel()
 
         logger.info("[BRIDGE] Room disconnected — ending bridge")
 
