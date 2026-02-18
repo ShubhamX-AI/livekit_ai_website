@@ -21,6 +21,7 @@ import warnings
 import hashlib
 import time
 import collections
+import json
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", DeprecationWarning)
@@ -62,8 +63,8 @@ LK_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 # RTP Port pool — MUST be outside LiveKit SIP's range (10000-40000) and LiveKit RTC's range (50000-60000).
 # Safe range: 41000-49999. Open these in your AWS Security Group for UDP.
 # Each concurrent call uses 2 ports (RTP + RTCP).
-RTP_PORT_START = int(os.getenv("RTP_PORT_START", "41000"))
-RTP_PORT_END   = int(os.getenv("RTP_PORT_END",   "41100"))  # 50 simultaneous calls max
+RTP_PORT_START = int(os.getenv("SIP_BRIDGE_PORT_RANGE_START", os.getenv("RTP_PORT_START", "31000")))
+RTP_PORT_END   = int(os.getenv("SIP_BRIDGE_PORT_RANGE_END", os.getenv("RTP_PORT_END", "31100")))  # 50 simultaneous calls max
 
 RTP_HEADER_SIZE   = 12
 PCMU_PAYLOAD_TYPE = 0
@@ -142,60 +143,6 @@ def get_port_pool() -> PortPool:
 # RTPMediaBridge
 # ─────────────────────────────────────────────────────────────────────────────
 
-class _RTPProtocol(asyncio.DatagramProtocol):
-    """
-    Asyncio DatagramProtocol for receiving RTP packets.
-    Uses the event loop's native I/O callbacks — far more reliable than
-    sock_recvfrom inside uvicorn/gunicorn which can silently drop packets.
-    """
-    def __init__(self, bridge: "RTPMediaBridge"):
-        self._bridge = bridge
-        self._transport: asyncio.DatagramTransport | None = None
-
-    def connection_made(self, transport: asyncio.DatagramTransport):
-        self._transport = transport
-        logger.info(f"[RTP] DatagramProtocol ready on 0.0.0.0:{self._bridge.local_port}")
-
-    def datagram_received(self, data: bytes, addr: tuple):
-        if len(data) <= RTP_HEADER_SIZE:
-            return
-
-        bridge = self._bridge
-        if not bridge._first_rx:
-            logger.info(f"[RTP] ✅ First inbound RTP from {addr} ({len(data)} B)")
-            bridge._first_rx = True
-
-        bridge._rx += 1
-        pt      = data[1] & 0x7F
-        payload = data[RTP_HEADER_SIZE:]
-
-        try:
-            pcm8 = audioop.alaw2lin(payload, 2) if pt == PCMA_PAYLOAD_TYPE else audioop.ulaw2lin(payload, 2)
-            pcm48, bridge._rs_in = audioop.ratecv(
-                pcm8, 2, 1, SAMPLE_RATE_SIP, SAMPLE_RATE_LK, bridge._rs_in
-            )
-            frame = rtc.AudioFrame(
-                data=pcm48,
-                sample_rate=SAMPLE_RATE_LK,
-                num_channels=1,
-                samples_per_channel=len(pcm48) // 2,
-            )
-            # Schedule coroutine on the event loop — datagram_received is sync
-            asyncio.ensure_future(bridge._audio_source.capture_frame(frame))
-        except Exception as e:
-            logger.error(f"[RTP] Decode error: {e}")
-
-    def error_received(self, exc: Exception):
-        logger.warning(f"[RTP] DatagramProtocol error: {exc}")
-
-    def connection_lost(self, exc):
-        logger.info("[RTP] DatagramProtocol connection lost")
-
-    def send(self, data: bytes, addr: tuple):
-        if self._transport:
-            self._transport.sendto(data, addr)
-
-
 class RTPMediaBridge:
     def __init__(self, public_ip: str, bind_port: int):
         """
@@ -207,10 +154,16 @@ class RTPMediaBridge:
                 "public_ip must be your EC2 public/Elastic IP. "
                 f"Got: '{public_ip}'. Check EXOTEL_MEDIA_IP."
             )
-        self._public_ip  = public_ip
-        self.local_port  = bind_port
-        self._protocol: _RTPProtocol | None = None
-        self._transport: asyncio.DatagramTransport | None = None
+        self._public_ip = public_ip
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._sock.bind(('0.0.0.0', bind_port))
+        self._sock.setblocking(False)
+        self.local_port = self._sock.getsockname()[1]
+        logger.info(
+            f"[RTP] Socket bound 0.0.0.0:{self.local_port} "
+            f"| SDP advertises {public_ip}:{self.local_port}"
+        )
 
         self._remote_addr: tuple[str, int] | None = None
         self._running      = False
@@ -223,8 +176,8 @@ class RTPMediaBridge:
         self._rtp_ts   = random.randint(0, 0xFFFFFFFF)
         self._rtp_ssrc = random.randint(0, 0xFFFFFFFF)
 
-        self._rs_in  = None
-        self._rs_out = None
+        self._rs_in  = None  # resample state inbound
+        self._rs_out = None  # resample state outbound
 
         self._rx = 0
         self._tx = 0
@@ -234,11 +187,12 @@ class RTPMediaBridge:
         # Buffer agent frames until set_remote_endpoint() is called
         self._frame_buffer: collections.deque = collections.deque(maxlen=MAX_FRAME_BUFFER)
 
-        # ptime accumulator — pack 2×10ms LiveKit frames → 1×20ms RTP packet
-        self._PTIME_BYTES    = 320  # 20ms @ 8kHz 16-bit = 160 samples = 320 bytes
+        # ptime accumulator: collect PCM until we have exactly 20ms to send.
+        # At 8kHz, 16-bit mono: 20ms = 160 samples = 320 bytes of PCM.
+        # G.711 encodes 1:1, so payload = 160 bytes. Total RTP = 172 bytes.
+        # LiveKit sends 10ms frames, so we pack 2 frames → 1 RTP packet.
+        self._PTIME_BYTES = 320  # 20ms at 8kHz 16-bit
         self._pcm_accumulator = b""
-
-        logger.info(f"[RTP] Bridge created for 0.0.0.0:{bind_port} | SDP advertises {public_ip}:{bind_port}")
 
     def set_remote_endpoint(self, ip: str, port: int, pt: int = PCMA_PAYLOAD_TYPE):
         self._remote_addr  = (ip, port)
@@ -249,18 +203,50 @@ class RTPMediaBridge:
         self._audio_source = rtc.AudioSource(SAMPLE_RATE_LK, 1)
         self._local_track  = rtc.LocalAudioTrack.create_audio_track("sip_audio", self._audio_source)
         await room.local_participant.publish_track(self._local_track)
-
-        # Use create_datagram_endpoint — the correct asyncio API for UDP.
-        # This registers native I/O callbacks with the event loop, unlike
-        # sock_recvfrom which polls and can be starved inside uvicorn.
-        loop = asyncio.get_running_loop()
-        self._protocol = _RTPProtocol(self)
-        self._transport, _ = await loop.create_datagram_endpoint(
-            lambda: self._protocol,
-            local_addr=('0.0.0.0', self.local_port)
-        )
         self._running = True
-        logger.info(f"[RTP] Inbound endpoint ready on 0.0.0.0:{self.local_port}")
+        task = asyncio.create_task(self._recv_loop())
+        task.add_done_callback(
+            lambda t: logger.error(f"[RTP] recv_loop DIED: {t.exception()}") 
+            if not t.cancelled() and t.exception() else None
+        )
+        logger.info(f"[RTP] Inbound loop started, listening on 0.0.0.0:{self.local_port}")
+
+    async def _recv_loop(self):
+        loop = asyncio.get_running_loop()
+        logger.info(f"[RTP] recv_loop STARTED port={self.local_port}")
+        while self._running:
+            try:
+                data, addr = await loop.sock_recvfrom(self._sock, 4096)
+                logger.info(f"[RTP] READ {len(data)} bytes from {addr}") 
+            except (OSError, asyncio.CancelledError):
+                break
+            except Exception:
+                await asyncio.sleep(0.001)
+                continue
+
+            if len(data) <= RTP_HEADER_SIZE:
+                continue
+
+            if not self._first_rx:
+                logger.info(f"[RTP] ✅ First inbound RTP from {addr} ({len(data)} B)")
+                self._first_rx = True
+
+            self._rx += 1
+            pt      = data[1] & 0x7F
+            payload = data[RTP_HEADER_SIZE:]
+
+            try:
+                pcm8 = audioop.alaw2lin(payload, 2) if pt == PCMA_PAYLOAD_TYPE else audioop.ulaw2lin(payload, 2)
+                pcm48, self._rs_in = audioop.ratecv(pcm8, 2, 1, SAMPLE_RATE_SIP, SAMPLE_RATE_LK, self._rs_in)
+                frame = rtc.AudioFrame(
+                    data=pcm48,
+                    sample_rate=SAMPLE_RATE_LK,
+                    num_channels=1,
+                    samples_per_channel=len(pcm48) // 2,
+                )
+                await self._audio_source.capture_frame(frame)
+            except Exception as e:
+                logger.error(f"[RTP] Decode error: {e}")
 
     async def send_to_rtp(self, frame: rtc.AudioFrame):
         """Send agent audio to remote RTP. Buffers if SIP not yet answered."""
@@ -273,7 +259,15 @@ class RTPMediaBridge:
         await self._send_frame(frame)
 
     async def _send_frame(self, frame: rtc.AudioFrame):
-        if not self._remote_addr or not self._transport:
+        """Accumulate PCM until we have 20ms, then send one RTP packet.
+
+        Why: SDP advertises a=ptime:20. Exotel expects 160-byte G.711 payloads
+        (20ms @ 8kHz). LiveKit produces 10ms frames (80 bytes). Sending 10ms
+        packets causes Exotel to drop them → caller hears silence.
+        We buffer until we have exactly 320 bytes of 8kHz 16-bit PCM (= 20ms),
+        then encode and send one correctly-sized packet.
+        """
+        if not self._remote_addr:
             return
         try:
             raw = bytes(frame.data.cast("b"))
@@ -282,6 +276,8 @@ class RTPMediaBridge:
             )
             self._pcm_accumulator += pcm8
 
+            # Send one packet per full 20ms chunk; discard any remainder
+            # (remainder is < 10ms and will be completed by the next frame)
             while len(self._pcm_accumulator) >= self._PTIME_BYTES:
                 chunk = self._pcm_accumulator[:self._PTIME_BYTES]
                 self._pcm_accumulator = self._pcm_accumulator[self._PTIME_BYTES:]
@@ -290,6 +286,7 @@ class RTPMediaBridge:
                            if self.negotiated_pt == PCMA_PAYLOAD_TYPE
                            else audioop.lin2ulaw(chunk, 2))
 
+                # Timestamp advances by exactly 160 samples (20ms @ 8kHz)
                 self._rtp_seq = (self._rtp_seq + 1) & 0xFFFF
                 self._rtp_ts  = (self._rtp_ts + 160) & 0xFFFFFFFF
                 hdr = struct.pack(
@@ -297,7 +294,7 @@ class RTPMediaBridge:
                     0x80, self.negotiated_pt,
                     self._rtp_seq, self._rtp_ts, self._rtp_ssrc
                 )
-                self._transport.sendto(hdr + payload, self._remote_addr)
+                self._sock.sendto(hdr + payload, self._remote_addr)
                 self._tx += 1
 
                 if not self._first_tx:
@@ -311,18 +308,17 @@ class RTPMediaBridge:
 
     def stop(self):
         self._running = False
-        if self._transport:
-            try:
-                self._transport.close()
-            except Exception:
-                pass
+        try:
+            self._sock.close()
+        except Exception:
+            pass
         logger.info(f"[RTP] Stopped | RX={self._rx} TX={self._tx}")
         if self._rx == 0:
             logger.warning(
                 "[RTP] ⚠️  ZERO inbound packets! Likely causes:\n"
                 "  1. EXOTEL_MEDIA_IP='%s' is wrong — must be EC2 Elastic/Public IP\n"
                 "  2. UDP port %d not open in Security Group for Exotel media IPs\n"
-                "  3. Port conflicts with another service (LiveKit SIP uses 10000-30000 — stay out of that range!)\n"
+                "  3. Port conflicts with another service (LiveKit SIP uses 10000-40000 — stay out of that range!)\n"
                 "  4. Exotel routing to wrong destination",
                 self._public_ip, self.local_port
             )
@@ -572,6 +568,7 @@ async def run_bridge(phone_number: str, agent_type: str = "invoice", room_name: 
 
         token = (AccessToken(LK_API_KEY, LK_API_SECRET)
                  .with_identity(f"sip-{phone_number}")
+                 .with_metadata(json.dumps({"source": "exotel_bridge"}))
                  .with_grants(VideoGrants(room_join=True, room=room_name))
                  .to_jwt())
         await room.connect(LK_URL, token)
@@ -586,6 +583,16 @@ async def run_bridge(phone_number: str, agent_type: str = "invoice", room_name: 
 
         # Flush buffered agent audio + open RTP path
         rtp_bridge.set_remote_endpoint(res["remote_ip"], res["remote_port"], res["pt"])
+
+        # Notify agent that call is answered
+        try:
+            await room.local_participant.publish_data(
+                json.dumps({"event": "call_answered"}).encode(),
+                topic="sip_bridge_events"
+            )
+            logger.info("[BRIDGE] Published call_answered event")
+        except Exception as e:
+            logger.error(f"[BRIDGE] Failed to publish call_answered event: {e}")
 
         sip_mon = asyncio.create_task(sip_client.wait_for_disconnection())
         while room.connection_state == rtc.ConnectionState.CONN_CONNECTED and not sip_mon.done():
