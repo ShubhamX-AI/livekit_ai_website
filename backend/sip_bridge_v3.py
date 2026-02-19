@@ -230,33 +230,48 @@ class RTPMediaBridge:
         )
         await room.local_participant.publish_track(self._local_track)
         self._running = True
+        self._recv_queue: asyncio.Queue = asyncio.Queue()
+
+        # add_reader works with uvloop — sock_recvfrom does NOT
+        loop = asyncio.get_running_loop()
+        loop.add_reader(self._sock.fileno(), self._on_rtp_readable)
+
         task = asyncio.create_task(self._recv_loop())
+
         def _on_recv_done(t: asyncio.Task):
             if t.cancelled():
                 logger.info("[RTP] recv_loop cancelled")
             elif t.exception():
-                logger.error(f"[RTP] recv_loop DIED", exc_info=t.exception())
+                logger.error("[RTP] recv_loop DIED", exc_info=t.exception())
             else:
                 logger.info("[RTP] recv_loop exited cleanly")
+
         task.add_done_callback(_on_recv_done)
         logger.info(
             f"[RTP] Inbound loop started, listening on 0.0.0.0:{self.local_port}"
         )
 
+    def _on_rtp_readable(self):
+        """Called by event loop when UDP socket has data. Works with uvloop."""
+        try:
+            data, addr = self._sock.recvfrom(4096)
+            self._recv_queue.put_nowait((data, addr))
+        except BlockingIOError:
+            pass  # no data yet, ignore
+        except Exception as e:
+            logger.error(f"[RTP] recvfrom error: {e}")
+
     async def _recv_loop(self):
-        loop = asyncio.get_running_loop()
         logger.info(f"[RTP] recv_loop STARTED port={self.local_port}")
         while self._running:
             try:
-                data, addr = await loop.sock_recvfrom(self._sock, 4096)
+                data, addr = await asyncio.wait_for(self._recv_queue.get(), timeout=5.0)
+            except asyncio.TimeoutError:
+                continue  # just check _running flag
             except asyncio.CancelledError:
                 break
-            except OSError as e:
-                logger.error(f"[RTP] Socket OSError (fatal): {e}")
-                break  # socket is dead, stop loop
             except Exception as e:
-                logger.error(f"[RTP] recv_loop unexpected error: {e}", exc_info=True)
-                await asyncio.sleep(0.001)
+                logger.error(f"[RTP] Queue error: {e}")
                 continue
 
             if len(data) <= RTP_HEADER_SIZE:
@@ -286,9 +301,6 @@ class RTPMediaBridge:
                     num_channels=1,
                     samples_per_channel=len(pcm48) // 2,
                 )
-                # CRITICAL FIX: await instead of ensure_future.
-                # ensure_future was flooding the event loop with 300 unawaited coroutines
-                # (the flushed buffer), starving sock_recvfrom of CPU time → RX=0
                 await self._audio_source.capture_frame(frame)
             except Exception as e:
                 logger.error(f"[RTP] Decode error: {e}", exc_info=True)
@@ -358,6 +370,12 @@ class RTPMediaBridge:
 
     def stop(self):
         self._running = False
+        try:
+            loop = asyncio.get_event_loop()
+            loop.remove_reader(self._sock.fileno())
+        except Exception:
+            # might not be registered or loop might be closed
+            pass
         try:
             self._sock.close()
         except Exception:
