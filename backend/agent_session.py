@@ -18,13 +18,14 @@ from agents.realestate.realestate_agent import RealestateAgent
 from agents.distributor.distributor_agent import DistributorAgent
 from agents.bandhan_banking.bandhan_banking import BandhanBankingAgent
 from agents.ambuja.ambuja_agent import AmbujaAgent
+from agents.hirebot.hirebot_agent import HirebotAgent
 from openai.types.beta.realtime.session import TurnDetection
 from livekit.plugins import cartesia
 from livekit.plugins.openai import realtime
 from openai.types.realtime import AudioTranscription
 import os
+import json
 import asyncio
-from typing import cast
 
 
 logger = logging.getLogger("agent")
@@ -41,6 +42,7 @@ AGENT_TYPES = {
     "distributor": DistributorAgent,
     "bandhan_banking": BandhanBankingAgent,
     "ambuja": AmbujaAgent,
+    "hirebot" : HirebotAgent,
 }
 
 
@@ -75,12 +77,12 @@ async def vyom_demos(ctx: JobContext):
             interrupt_response=True,
         ),
         modalities=["text"],
-        api_key=cast(str, os.getenv("OPENAI_API_KEY")),
+        api_key=os.getenv("OPENAI_API_KEY", ""),
     )
     tts = cartesia.TTS(
         model="sonic-3", 
-        voice="f6141af3-5f94-418c-80ed-a45d450e7e2e",
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice=os.getenv("CARTESIA_VOICE_ID", "") if agent_type != "hirebot" else os.getenv("CARTESIA_VOICE_ID_HIREBOT", ""),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         )
     
     session = AgentSession(
@@ -127,15 +129,48 @@ async def vyom_demos(ctx: JobContext):
         participant = await ctx.wait_for_participant()
 
         is_sip = participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-        logger.info(f"Participant joined: {participant.identity}, kind={participant.kind}, is_sip={is_sip}")
+
+        # Also detect Exotel bridge participants (they join as regular WebRTC
+        # participants with metadata containing "source": "exotel_bridge")
+        is_exotel_bridge = False
+        if participant.metadata:
+            try:
+                meta = json.loads(participant.metadata)
+                is_exotel_bridge = meta.get("source") == "exotel_bridge"
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        is_phone_call = is_sip or is_exotel_bridge
+        logger.info(
+            f"Participant joined: {participant.identity}, "
+            f"kind={participant.kind}, is_sip={is_sip}, "
+            f"is_exotel_bridge={is_exotel_bridge}"
+        )
 
         audio_ready = asyncio.Event()
 
-        @ctx.room.on("track_published")
-        def on_track_published(publication: rtc.RemoteTrackPublication, p: rtc.RemoteParticipant):
-            if p.identity == participant.identity and publication.kind == rtc.TrackKind.KIND_AUDIO:
-                logger.info("SIP audio track published — call answered")
-                audio_ready.set()
+        if is_exotel_bridge:
+            # For Exotel bridge: wait for the actual "call_answered" data message
+            # from the SIP bridge (sent only after SIP 200 OK - phone picked up).
+            # The bridge publishes its audio track IMMEDIATELY on joining,
+            # which is BEFORE the phone even rings, so track_published is unreliable.
+            @ctx.room.on("data_received")
+            def on_data_received(data: rtc.DataPacket):
+                if data.topic == "sip_bridge_events":
+                    try:
+                        msg = json.loads(data.data.decode())
+                        if msg.get("event") == "call_answered":
+                            logger.info("Exotel bridge reported call answered (SIP 200 OK)")
+                            audio_ready.set()
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+        else:
+            # For standard SIP calls: use the track_published approach
+            @ctx.room.on("track_published")
+            def on_track_published(publication: rtc.RemoteTrackPublication, p: rtc.RemoteParticipant):
+                if p.identity == participant.identity and publication.kind == rtc.TrackKind.KIND_AUDIO:
+                    logger.info("SIP audio track published — call answered")
+                    audio_ready.set()
 
         # --- Background Audio Start ---
         try:
@@ -144,16 +179,15 @@ async def vyom_demos(ctx: JobContext):
         except Exception as e:
             logger.error(f"Failed to start background audio: {e}")
 
-        @ctx.room.on("data_received")
-        def on_data_received(data: rtc.DataPacket):
-            if data.topic == "lk.transcription":
-                pass # Ignore transcription logs
-
         # --- INITIATING SPEECH ---
         if agent_type != "ambuja":
-            if is_sip:
-                logger.info("Waiting for SIP call to be answered...")
-                await audio_ready.wait()
+            if is_phone_call:
+                logger.info("Waiting for phone call to be answered (SIP or Exotel bridge)...")
+                try:
+                    await asyncio.wait_for(audio_ready.wait(), timeout=60.0)
+                except asyncio.TimeoutError:
+                    logger.error("Timed out waiting for call to be answered (60s)")
+                    return
                 # Buffer for RTP stabilization - longer delay ensures welcome message is heard
                 await asyncio.sleep(2.0)
 

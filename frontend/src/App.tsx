@@ -8,6 +8,11 @@ import VoiceAssistant from './components2_bank/VoiceAssistant';
 import { LockScreen } from './components2_bank/LockScreen';
 import { useEffect, useState } from 'react';
 import type { AgentType } from './types/agent';
+import HirebotPage from './pages/HirebotPage';
+
+// --- New Imports for Call Functionality ---
+// import { OutboundCallModal } from './components2_bank/OutboundCallModal'; // Removed from minimalist view
+// import { Phone } from 'lucide-react'; // Removed from minimalist view
 
 // Safely access environment variables with fallback
 const LIVEKIT_URL = import.meta.env?.VITE_LIVEKIT_URL || '';
@@ -15,6 +20,9 @@ const LIVEKIT_URL = import.meta.env?.VITE_LIVEKIT_URL || '';
 // Legacy agent component wrapper (for web/invoice/restaurant agents)
 function LegacyAgentPage({ agentType }: { agentType: AgentType }) {
   const [token, setToken] = useState<string>('');
+
+  // State for the Outbound Call Modal removed
+
 
   useEffect(() => {
     // Check sessionStorage for token
@@ -53,10 +61,12 @@ function LegacyAgentPage({ agentType }: { agentType: AgentType }) {
         setToken('');
         sessionStorage.removeItem('livekit_token');
         sessionStorage.removeItem('agent_type');
-        window.location.href = '/';
+        window.location.href = agentType === 'hirebot' ? '/hirebot' : '/';
       }}
     >
       <VoiceAssistant />
+
+
       <RoomAudioRenderer />
       <StartAudio label="Click to allow audio playback" />
     </LiveKitRoom>
@@ -98,6 +108,8 @@ export default function App() {
       <Route path="/distributor" element={<LegacyAgentPage agentType="distributor" />} />
       <Route path="/bandhan_banking" element={<BandhanBankingPage />} />
       <Route path="/ambuja" element={<AmbujaPage />} />
+      <Route path="/hirebot" element={<HirebotPage />} />
+      <Route path="/hirebot/web" element={<LegacyAgentPage agentType="hirebot" />} />
     </Routes>
   );
 }

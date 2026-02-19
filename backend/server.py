@@ -42,7 +42,7 @@ app.add_middleware(
 
 ## The agent currently supported
 ALLOWED_AGENTS = {"web", "invoice", "restaurant", "bank", "tour", 
-"realestate", "distributor", "bandhan_banking", "ambuja"}
+"realestate", "distributor", "bandhan_banking", "ambuja", "hirebot"}
 
 # Initialize the classes
 outbound_call = OutboundCall()

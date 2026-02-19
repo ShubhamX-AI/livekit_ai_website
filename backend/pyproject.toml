@@ -12,5 +12,6 @@ dependencies = [
     "openai>=2.15.0",
     "pip-system-certs>=5.3",
     "python-dotenv>=1.2.1",
-    "onnxruntime>=1.17.0"
+    "onnxruntime>=1.17.0",
+    "pjsua2-pybind11>=0.1a3",
 ]

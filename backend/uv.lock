@@ -224,6 +224,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "openai" },
     { name = "pip-system-certs" },
+    { name = "pjsua2-pybind11" },
     { name = "python-dotenv" },
 ]
 
@@ -236,6 +237,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.17.0" },
     { name = "openai", specifier = ">=2.15.0" },
     { name = "pip-system-certs", specifier = ">=5.3" },
+    { name = "pjsua2-pybind11", specifier = ">=0.1a3" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
 ]
 
@@ -1796,6 +1798,14 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7d/6a/563b05a4f6c9ddc205c98bb413e74221368efb98b8fb9cca96b578b8930c/pip_system_certs-5.3.tar.gz", hash = "sha256:19c8bf9957bcce7d69c4dbc2d0b2ef13de1984d53f50a59012e6dbbad0af67c6", size = 6395, upload-time = "2025-10-16T06:14:55.217Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9f/57/752b63c609affae8f26ae0f1d1103d6ea7e707ad45943f62f7422936071d/pip_system_certs-5.3-py3-none-any.whl", hash = "sha256:3fbb5de62e374a99b688b1ad06e64ee5c4aeb633ef23e3a677d32e3e84fd863c", size = 6896, upload-time = "2025-10-16T06:14:54.072Z" },
+]
+
+[[package]]
+name = "pjsua2-pybind11"
+version = "0.1a3"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/69/342b795ba1e0a7b51c3cdfb1dce4361f6271330706d3343f028c7accc61f/pjsua2_pybind11-0.1a3-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:cf39c0878395d470f942769129d80f90cf0b12bb3f1a811120984c1a42fecc0a", size = 4716103, upload-time = "2024-12-31T06:00:08.631Z" },
 ]
 
 [[package]]

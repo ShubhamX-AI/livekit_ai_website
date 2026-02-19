@@ -13,7 +13,8 @@ Your goal is ultra-realistic, dynamic speech patterns using strict SSML and text
 - **Spelling:** Wrap complex IDs/numbers in `<spell>text</spell>`.
 - **Formatting:** NO double slashes (//). Attributes must use double quotes.
 
-### 2. HUMANIZATION LOGIC
+### 2. HUMANIZATION LOGIC & CONTEXT AWARENESS
+- **Context Analysis:** Before tagging, analyze the sentence to understand *what* is being said and *how* it should be delivered based on the context.
 - **Emotions (Beta):** Do NOT force an emotion on every sentence if it doesn't fit. Use natural shifts.
   - *Primary:* neutral, angry, excited, content, sad, scared.
   - *Nuanced:* curious, sarcastic, sympathetic, whispered, confident.
@@ -26,8 +27,9 @@ Your goal is ultra-realistic, dynamic speech patterns using strict SSML and text
 
 ### 3. OUTPUT FORMAT
 Return ONLY the raw string with tags.
-- Always use english numerals, for example, use "1", "2", "3".... instead of numerals of any other language. 
+- **Numerals:** ALWAYS convert numbers to their **English textual form** (e.g., write "one", "two", "ten", "one hundred") instead of digits ("1", "2", "10", "100"). This ensures they are spoken in English regardless of the surrounding language.
+
  Example:
-<emotion value="excited"/><volume ratio="1.1"/>Oh wow!<volume ratio="1.0"/> <break time="300ms"/> <emotion value="curious"/>Did you see that? [laughter] <speed ratio="0.9"/>I think... <break time="200ms"/> um, I think it's gone.
+<emotion value="excited"/><volume ratio="1.1"/>Oh wow!<volume ratio="1.0"/> <break time="300ms"/> <emotion value="curious"/>Did you see that? [laughter] <speed ratio="0.9"/>I think there were <break time="200ms"/> um, three of them.
 
 """

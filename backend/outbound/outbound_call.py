@@ -12,8 +12,14 @@ from services.lvk_services import (
     create_sip_outbound_trunk,
     list_sip_outbound_trunks,
     format_success_response,
+    format_success_response,
     format_error_response
 )
+import sys
+# Allow importing sip_bridge from parent directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from sip_bridge_v3 import run_bridge
+import asyncio
 
 
 class OutboundCall:
@@ -69,6 +75,34 @@ class OutboundCall:
             self.logger.info(f"Created dispatch: {dispatch}")
             self.logger.info(f"Dialing {phone_number} to room {unique_room_name}")
 
+            
+            if call_from == "exotel":
+                # Use custom SIP bridge — pass the EXISTING room name
+                # so the bridge joins the same room where the agent was dispatched.
+                self.logger.info(
+                    f"Triggering SIP Bridge for {phone_number} "
+                    f"with agent {agent_type} in room {unique_room_name}"
+                )
+                
+                asyncio.create_task(
+                    run_bridge(
+                        phone_number=phone_number,
+                        agent_type=agent_type,
+                        room_name=unique_room_name,
+                    )
+                )
+                
+                return format_success_response(
+                    message="SIP Bridge Initiated",
+                    data={
+                        "room": unique_room_name,
+                        "call_to_phone_number": phone_number,
+                        "agent": agent_type,
+                        "method": "custom_bridge"
+                    }
+                )
+
+            # Standard Logic for Twilio/Others
             # Select trunk based on call_from parameter
             trunk_id = self.exotel_trunk_id if call_from == "exotel" else self.twilio_trunk_id
             

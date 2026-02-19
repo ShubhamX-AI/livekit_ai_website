@@ -11,7 +11,7 @@ interface OutboundCallModalProps {
 
 export function OutboundCallModal({ isOpen, onClose, agentType }: OutboundCallModalProps) {
     const [phoneNumber, setPhoneNumber] = useState<string | undefined>();
-    const [provider, setProvider] = useState<'exotel' | 'twilio'>('exotel');
+    const [provider, setProvider] = useState<'exotel' | 'twilio'>(agentType === 'hirebot' ? 'twilio' : 'exotel');
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
@@ -154,13 +154,15 @@ export function OutboundCallModal({ isOpen, onClose, agentType }: OutboundCallMo
                                 <label className="block text-sm font-medium text-gray-700 ml-1">
                                     SIP Provider
                                 </label>
-                                <div className="grid grid-cols-2 gap-3 p-1 bg-gray-100 rounded-2xl relative">
-                                    <button
-                                        onClick={() => setProvider('exotel')}
-                                        className={`relative z-10 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${provider === 'exotel' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        Exotel
-                                    </button>
+                                <div className={`grid gap-3 p-1 bg-gray-100 rounded-2xl relative ${agentType === 'hirebot' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                    {agentType !== 'hirebot' && (
+                                        <button
+                                            onClick={() => setProvider('exotel')}
+                                            className={`relative z-10 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${provider === 'exotel' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Exotel
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setProvider('twilio')}
                                         className={`relative z-10 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${provider === 'twilio' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
@@ -168,7 +170,10 @@ export function OutboundCallModal({ isOpen, onClose, agentType }: OutboundCallMo
                                         Twilio
                                     </button>
                                     <div
-                                        className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow-sm rounded-xl transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${provider === 'exotel' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
+                                        className={`absolute top-1 bottom-1 bg-white shadow-sm rounded-xl transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${agentType === 'hirebot'
+                                                ? 'left-1 right-1 w-[calc(100%-8px)]'
+                                                : `w-[calc(50%-4px)] ${provider === 'exotel' ? 'left-1' : 'left-[calc(50%+2px)]'}`
+                                            }`}
                                     />
                                 </div>
                             </div>

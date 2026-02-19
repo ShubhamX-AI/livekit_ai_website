@@ -1,9 +1,9 @@
 {
     "trunk": {
         "name": "outbout_trunk_exotel",
-        "address": "lokaviveka1m.pstn.exotel.com",
+        "address": "pstn.in1.exotel.com",
         "numbers": [
-            "+918044319240"
+            "08044319240"
         ],
         "authUsername": "accounts@lokaviveka.com",
         "authPassword": "loka@viveka@123!@#"

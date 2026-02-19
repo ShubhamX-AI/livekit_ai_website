@@ -8,6 +8,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: [ "python", "server_run.py" ]
+    network_mode: "host"
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -26,6 +27,7 @@ services:
   agent-worker:
     image: shubhamint/livekit_api_server:latest
     command: [ "python", "agent_session.py", "start" ]
+    network_mode: "host"
     depends_on:
       api-server:
         condition: service_healthy
