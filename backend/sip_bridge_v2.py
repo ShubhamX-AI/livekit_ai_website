@@ -893,7 +893,7 @@ async def run_bridge(
                 break
 
             # RTP was flowing but stopped for 20s — caller hung up
-            if since_rx is not None and since_rx > 20:
+            if since_rx is not None and since_rx > 100:
                 logger.info(f"[RTP] No audio for {since_rx:.0f}s — caller hung up, ending call")
                 break
 
