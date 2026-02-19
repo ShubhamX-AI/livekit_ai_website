@@ -228,7 +228,11 @@ class RTPMediaBridge:
         self._local_track = rtc.LocalAudioTrack.create_audio_track(
             "sip_audio", self._audio_source
         )
-        await room.local_participant.publish_track(self._local_track)
+        # ← ADD THIS: tell the agent session this is a microphone track
+        publish_options = rtc.TrackPublishOptions(
+            source=rtc.TrackSource.SOURCE_MICROPHONE
+        )
+        await room.local_participant.publish_track(self._local_track, publish_options)
         self._running = True
         self._recv_queue: asyncio.Queue = asyncio.Queue()
 
