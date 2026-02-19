@@ -663,7 +663,7 @@ class ExotelSipClient:
         try:
             buf = b""
             while True:
-                data = await asyncio.wait_for(self._reader.read(4096), timeout=30.0)
+                data = await asyncio.wait_for(self._reader.read(4096), timeout=120.0)
                 if not data:
                     logger.info("[SIP] Disconnected (TCP close)")
                     break
