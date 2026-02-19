@@ -21,6 +21,7 @@ from agents.ambuja.ambuja_agent import AmbujaAgent
 from agents.hirebot.hirebot_agent import HirebotAgent
 from openai.types.beta.realtime.session import TurnDetection
 from livekit.plugins import cartesia
+from livekit.plugins import sarvam
 from livekit.plugins.openai import realtime
 from openai.types.realtime import AudioTranscription
 import os
@@ -79,11 +80,29 @@ async def vyom_demos(ctx: JobContext):
         modalities=["text"],
         api_key=os.getenv("OPENAI_API_KEY", ""),
     )
-    tts = cartesia.TTS(
-        model="sonic-3", 
-        voice=os.getenv("CARTESIA_VOICE_ID", "") if agent_type != "hirebot" else os.getenv("CARTESIA_VOICE_ID_HIREBOT", ""),
-        api_key=os.getenv("CARTESIA_API_KEY", ""),
-        )
+
+    match agent_type:
+        case "hirebot":
+            tts = cartesia.TTS(
+                model="sonic-3", 
+                voice=os.getenv("CARTESIA_VOICE_ID_HIREBOT", ""),
+                api_key=os.getenv("CARTESIA_API_KEY", ""),
+                )
+        case "bandhan_banking":
+            tts = sarvam.TTS(
+                model="bulbul:v3", 
+                target_language_code="en-IN",
+                pace=1.1,
+                speaker=os.getenv("SARVAM_SPEAKER_BANDHAN_BANKING", ""),
+                api_key=os.getenv("SARVAM_API_KEY", ""),
+                )
+        case _:
+            tts = cartesia.TTS(
+                model="sonic-3", 
+                speed=1.1,
+                voice=os.getenv("CARTESIA_VOICE_ID", ""),
+                api_key=os.getenv("CARTESIA_API_KEY", ""),
+                )
     
     session = AgentSession(
         llm=llm,
