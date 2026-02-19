@@ -77,6 +77,7 @@ SAMPLE_RATE_SIP = 8000
 SAMPLE_RATE_LK = 48000
 MAX_FRAME_BUFFER = 300  # ~6 seconds of 20ms frames
 NO_RTP_AFTER_ANSWER_SECONDS = int(os.getenv("NO_RTP_AFTER_ANSWER_SECONDS", "60"))
+RTP_SILENCE_TIMEOUT_SECONDS = int(os.getenv("RTP_SILENCE_TIMEOUT_SECONDS", "30"))
 INBOUND_SIP_LISTEN = os.getenv("INBOUND_SIP_LISTEN", "true").lower() in (
     "1",
     "true",
@@ -876,28 +877,59 @@ async def run_bridge(
         except Exception as e:
             logger.error(f"[BRIDGE] Failed to publish call_answered event: {e}")
 
+        disconnect_reason = "unknown"
         sip_mon = asyncio.create_task(sip_client.wait_for_disconnection())
-        while (
-            room.connection_state == rtc.ConnectionState.CONN_CONNECTED
-            and not sip_mon.done()
-        ):
-            if inbound_bye and inbound_bye.is_set():
-                logger.info("[SIP] Inbound BYE received")
+        while True:
+            # ── Signal 1: LiveKit room disconnected ──
+            if room.connection_state != rtc.ConnectionState.CONN_CONNECTED:
+                disconnect_reason = "livekit_disconnected"
+                logger.info("[BRIDGE] LiveKit room disconnected")
                 break
-            if NO_RTP_AFTER_ANSWER_SECONDS > 0:
-                since_rx = rtp_bridge.seconds_since_rx()
-                if (
-                    since_rx is None
-                    and (time.time() - answered_at) > NO_RTP_AFTER_ANSWER_SECONDS
-                ):
-                    logger.error(
-                        "[RTP] No inbound RTP after answer for %ss; ending call",
-                        NO_RTP_AFTER_ANSWER_SECONDS,
-                    )
-                    break
-            await asyncio.sleep(2)
 
-        logger.info("[BRIDGE] Call ended")
+            # ── Signal 2: SIP BYE on outbound TCP (same connection as INVITE) ──
+            if sip_mon.done():
+                disconnect_reason = "sip_bye_outbound_tcp"
+                logger.info("[BRIDGE] SIP BYE received on outbound TCP")
+                break
+
+            # ── Signal 3: SIP BYE on inbound TCP listener (new connection from Exotel) ──
+            if inbound_bye and inbound_bye.is_set():
+                disconnect_reason = "sip_bye_inbound_tcp"
+                logger.info("[BRIDGE] SIP BYE received on inbound TCP listener")
+                break
+
+            since_rx = rtp_bridge.seconds_since_rx()
+
+            # ── Signal 4: No RTP ever arrived after answer — call setup failure ──
+            if (
+                since_rx is None
+                and NO_RTP_AFTER_ANSWER_SECONDS > 0
+                and (time.time() - answered_at) > NO_RTP_AFTER_ANSWER_SECONDS
+            ):
+                disconnect_reason = "no_rtp_after_answer"
+                logger.error(
+                    "[RTP] No inbound RTP after %ss — call never connected, ending",
+                    NO_RTP_AFTER_ANSWER_SECONDS,
+                )
+                break
+
+            # ── Signal 5: RTP was flowing but stopped — caller hung up ──
+            if (
+                since_rx is not None
+                and RTP_SILENCE_TIMEOUT_SECONDS > 0
+                and since_rx > RTP_SILENCE_TIMEOUT_SECONDS
+            ):
+                disconnect_reason = "rtp_silence_after_flow"
+                logger.info(
+                    "[RTP] No audio for %.0fs (threshold=%ss) — caller hung up",
+                    since_rx,
+                    RTP_SILENCE_TIMEOUT_SECONDS,
+                )
+                break
+
+            await asyncio.sleep(1)
+
+        logger.info(f"[BRIDGE] Call ended — reason={disconnect_reason}")
 
     except Exception as e:
         logger.error(f"[BRIDGE] Error: {e}", exc_info=True)

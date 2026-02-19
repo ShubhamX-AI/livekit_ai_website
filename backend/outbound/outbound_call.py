@@ -18,7 +18,7 @@ from services.lvk_services import (
 import sys
 # Allow importing sip_bridge from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from sip_bridge_v2 import run_bridge
+from custom_sip_reach import run_bridge
 import asyncio
 
 
