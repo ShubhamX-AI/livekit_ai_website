@@ -69,7 +69,8 @@ async def handle_inbound_call(
         phone_number = to_header.split("sip:")[1].split("@")[0]
 
     # Map the dialed Exotel number to a specific agent type
-    from ..inbound.config_manager import get_agent_for_number
+    from inbound.config_manager import get_agent_for_number
+    logger.info(f"[INBOUND] call-id={call_id} phone={phone_number}")
     agent_type = get_agent_for_number(phone_number)
 
     # agent_session.py expects room_name to start with {agent_type}-...
