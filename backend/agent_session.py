@@ -10,6 +10,7 @@ from livekit.agents import (
     BackgroundAudioPlayer,
     AudioConfig,
     TurnHandlingOptions,
+    NOT_GIVEN,
 )
 from agents.invoice.invoice_agent import InvoiceAgent
 from agents.restaurant.restaurant_agent import RestaurantAgent
@@ -78,7 +79,7 @@ async def vyom_demos(ctx: JobContext):
             type="semantic_vad",
             eagerness="high",
             create_response=True,
-            interrupt_response=True,
+            interrupt_response=False,
         ),
         modalities=["text"],
         api_key=os.getenv("OPENAI_API_KEY", ""),
@@ -246,16 +247,19 @@ async def vyom_demos(ctx: JobContext):
                 await asyncio.sleep(0.5)
 
             welcome_message = agent_instance.welcome_message
+            agent_instance._allow_interruptions = False  # Ensure welcome message is not interrupted
             logger.info(f"Sending welcome message: '{welcome_message}' for agent: {agent_type}")
             try:
                 # Specific to Kingston
                 if agent_type == "kingston":
-                    await session.generate_reply(instructions=agent_instance.welcome_instructions)
+                    await session.generate_reply(instructions=agent_instance.welcome_instructions, allow_interruptions=False)
                 else:
-                    await session.say(text=welcome_message, allow_interruptions=True)
+                    await session.say(text=welcome_message, allow_interruptions=False)
                 logger.info("Welcome message sent successfully")
             except Exception as e:
                 logger.error(f"Failed to send welcome message: {e}", exc_info=True)
+            finally:
+                agent_instance._allow_interruptions = NOT_GIVEN  # Revert to default interruption behavior after welcome message
 
         # --- KEEP ALIVE LOOP ---
         participant_left = asyncio.Event()
